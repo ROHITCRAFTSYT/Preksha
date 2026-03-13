@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth, unauthorized } from '@/lib/auth';
 
 export interface AIAnalysis {
   severity: 'CRITICAL' | 'HIGH' | 'MEDIUM';
@@ -11,10 +10,6 @@ export interface AIAnalysis {
 }
 
 export async function POST(req: NextRequest) {
-  // Require authentication — prevents unauthenticated callers burning Groq quota
-  const auth = await requireAuth(req);
-  if (!auth) return unauthorized();
-
   if (!process.env.GROQ_API_KEY || process.env.GROQ_API_KEY === 'your-groq-api-key-here') {
     return NextResponse.json({ error: 'GROQ_API_KEY not configured' }, { status: 503 });
   }

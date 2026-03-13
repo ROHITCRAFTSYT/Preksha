@@ -155,7 +155,7 @@ export default function AIAnalysisModal({ service, incidents, onClose }: Props) 
                 <AlertTriangle size={14} className="text-red-400 mx-auto mb-2" />
                 <p className="text-[10px] text-red-400 tracking-wider">{error}</p>
                 <p className="text-[8px] text-white/20 mt-1">
-                  Add ANTHROPIC_API_KEY to .env.local to enable AI analysis
+                  Ensure GROQ_API_KEY is set in .env.local to enable AI analysis
                 </p>
               </div>
             )}

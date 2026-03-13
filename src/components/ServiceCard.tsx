@@ -11,10 +11,11 @@ interface ServiceCardProps {
   onRestoreService?: (id: string) => void;
   chaosMode?: boolean;
   incidents?: { message: string; created_at: string }[];
+  expanded?: boolean;
+  onToggleExpand?: () => void;
 }
 
-export default function ServiceCard({ service, onSimulateOutage, onRestoreService, chaosMode, incidents = [] }: ServiceCardProps) {
-  const [expanded, setExpanded] = useState(false);
+export default function ServiceCard({ service, onSimulateOutage, onRestoreService, chaosMode, incidents = [], expanded = false, onToggleExpand }: ServiceCardProps) {
   const [aiOpen, setAiOpen] = useState(false);
 
   const latencyBar = Math.min(100, (service.latency / 2000) * 100);
@@ -24,7 +25,7 @@ export default function ServiceCard({ service, onSimulateOutage, onRestoreServic
 
   return (
     <div
-      className={`border font-mono text-xs transition-colors duration-300 relative overflow-hidden ${
+      className={`border font-mono text-sm transition-colors duration-300 relative overflow-hidden ${
         service.chaosActive
           ? 'border-red-500/60 bg-red-950/20'
           : getStatusBg(service.status)
@@ -56,9 +57,9 @@ export default function ServiceCard({ service, onSimulateOutage, onRestoreServic
       <div
         role="button"
         tabIndex={0}
-        className="p-3 flex items-start gap-3 hover:bg-white/[0.02] transition-colors duration-150 cursor-pointer select-none"
-        onClick={() => setExpanded((v) => !v)}
-        onKeyDown={(e) => e.key === 'Enter' || e.key === ' ' ? setExpanded((v) => !v) : null}
+        className="p-4 flex items-start gap-3 hover:bg-white/[0.02] transition-colors duration-150 cursor-pointer select-none"
+        onClick={onToggleExpand}
+        onKeyDown={(e) => e.key === 'Enter' || e.key === ' ' ? onToggleExpand?.() : null}
         aria-expanded={expanded}
       >
         {/* Status dot */}
@@ -74,22 +75,22 @@ export default function ServiceCard({ service, onSimulateOutage, onRestoreServic
           {/* Name + status row */}
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <div className="text-white font-bold text-[11px] tracking-wider truncate">{service.name}</div>
-              <div className="text-white/40 text-[9px] mt-0.5 tracking-widest">
+              <div className="text-white font-bold text-xs tracking-wider truncate">{service.name}</div>
+              <div className="text-white/40 text-[10px] mt-0.5 tracking-widest">
                 {service.category} · {service.region}
               </div>
             </div>
 
             {/* Right side: status label + AI button */}
             <div className="flex flex-col items-end gap-1.5 flex-shrink-0 pr-5">
-              <span className={`text-[9px] font-bold tracking-widest ${getStatusColor(service.status)}`}>
+              <span className={`text-[10px] font-bold tracking-widest ${getStatusColor(service.status)}`}>
                 {getStatusLabel(service.status)}
               </span>
               {canAnalyse && (
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); setAiOpen(true); }}
-                  className="text-[8px] tracking-widest text-green-400/70 hover:text-green-400 border border-green-500/20 hover:border-green-500/50 px-1.5 py-0.5 transition-all hover:bg-green-500/5 flex items-center gap-1"
+                  className="text-[9px] tracking-widest text-green-400/70 hover:text-green-400 border border-green-500/20 hover:border-green-500/50 px-2 py-1 transition-all hover:bg-green-500/5 flex items-center gap-1"
                 >
                   ⚡ AI ANALYSE
                 </button>
@@ -101,7 +102,7 @@ export default function ServiceCard({ service, onSimulateOutage, onRestoreServic
           <div className="mt-2 space-y-1">
             {/* Latency */}
             <div className="flex items-center gap-2">
-              <span className="text-white/40 text-[8px] w-12 flex-shrink-0">LATENCY</span>
+              <span className="text-white/40 text-[9px] w-14 flex-shrink-0">LATENCY</span>
               <div className="flex-1 h-1 bg-white/10 overflow-hidden">
                 <div
                   className={`h-full transition-all duration-700 ${
@@ -112,7 +113,7 @@ export default function ServiceCard({ service, onSimulateOutage, onRestoreServic
                   style={{ width: `${latencyBar}%` }}
                 />
               </div>
-              <span className={`text-[8px] w-12 text-right flex-shrink-0 tabular-nums ${
+              <span className={`text-[10px] w-14 text-right flex-shrink-0 tabular-nums ${
                 service.latency === 0 ? 'text-gray-500' :
                 service.latency > 800 ? 'text-red-400' :
                 service.latency > 400 ? 'text-yellow-400' : 'text-green-400'
@@ -123,7 +124,7 @@ export default function ServiceCard({ service, onSimulateOutage, onRestoreServic
 
             {/* Uptime */}
             <div className="flex items-center gap-2">
-              <span className="text-white/40 text-[8px] w-12 flex-shrink-0">UPTIME</span>
+              <span className="text-white/40 text-[9px] w-14 flex-shrink-0">UPTIME</span>
               <div className="flex-1 h-1 bg-white/10 overflow-hidden">
                 <div
                   className={`h-full transition-all duration-700 ${
@@ -133,7 +134,7 @@ export default function ServiceCard({ service, onSimulateOutage, onRestoreServic
                   style={{ width: `${uptimeBar}%` }}
                 />
               </div>
-              <span className={`text-[8px] w-12 text-right flex-shrink-0 tabular-nums ${
+              <span className={`text-[10px] w-14 text-right flex-shrink-0 tabular-nums ${
                 uptimeBar > 99 ? 'text-green-400' :
                 uptimeBar > 95 ? 'text-yellow-400' : 'text-red-400'
               }`}>
@@ -162,13 +163,13 @@ export default function ServiceCard({ service, onSimulateOutage, onRestoreServic
             transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
             style={{ overflow: 'hidden' }}
           >
-            <div className="border-t border-white/10 p-3 space-y-3">
+            <div className="border-t border-white/10 p-4 space-y-3">
               {/* Description */}
-              <p className="text-white/50 text-[9px] leading-relaxed">{service.description}</p>
+              <p className="text-white/50 text-[10px] leading-relaxed">{service.description}</p>
 
               {/* Latency sparkline */}
               <div>
-                <div className="text-[8px] text-white/30 mb-1.5 tracking-widest">LATENCY HISTORY</div>
+                <div className="text-[9px] text-white/30 mb-1.5 tracking-widest">LATENCY HISTORY</div>
                 <div className="flex items-end gap-px h-8">
                   {service.history.slice(-20).map((point, i) => {
                     const barH = point.latency === 0 ? 2 : Math.max(2, (point.latency / 2000) * 32);
@@ -191,7 +192,7 @@ export default function ServiceCard({ service, onSimulateOutage, onRestoreServic
               {/* Fallback routes — only for degraded / outage */}
               {(service.status === 'degraded' || service.status === 'outage') && service.fallbacks.length > 0 && (
                 <div>
-                  <div className="text-[8px] text-yellow-400/80 mb-1.5 tracking-widest flex items-center gap-1">
+                  <div className="text-[9px] text-yellow-400/80 mb-1.5 tracking-widest flex items-center gap-1">
                     ⚠ FALLBACK ROUTES AVAILABLE
                   </div>
                   <div className="space-y-1.5">
@@ -199,8 +200,8 @@ export default function ServiceCard({ service, onSimulateOutage, onRestoreServic
                       <div key={i} className="flex items-start gap-2 bg-white/5 border border-white/10 p-2">
                         <span className="text-yellow-400 text-[9px] mt-0.5 flex-shrink-0">→</span>
                         <div>
-                          <div className="text-white text-[9px] font-bold">{fb.label}</div>
-                          <div className="text-white/40 text-[8px]">{fb.description}</div>
+                          <div className="text-white text-[10px] font-bold">{fb.label}</div>
+                          <div className="text-white/40 text-[9px]">{fb.description}</div>
                         </div>
                       </div>
                     ))}
@@ -215,7 +216,7 @@ export default function ServiceCard({ service, onSimulateOutage, onRestoreServic
                     <button
                       type="button"
                       onClick={() => onSimulateOutage?.(service.id)}
-                      className="flex-1 py-1.5 border border-red-500/50 text-red-400 text-[9px] hover:bg-red-500/10 active:bg-red-500/20 transition-colors tracking-widest"
+                      className="flex-1 py-2 border border-red-500/50 text-red-400 text-[10px] hover:bg-red-500/10 active:bg-red-500/20 transition-colors tracking-widest"
                     >
                       ⚡ INJECT FAILURE
                     </button>
@@ -223,7 +224,7 @@ export default function ServiceCard({ service, onSimulateOutage, onRestoreServic
                     <button
                       type="button"
                       onClick={() => onRestoreService?.(service.id)}
-                      className="flex-1 py-1.5 border border-green-500/50 text-green-400 text-[9px] hover:bg-green-500/10 active:bg-green-500/20 transition-colors tracking-widest"
+                      className="flex-1 py-2 border border-green-500/50 text-green-400 text-[10px] hover:bg-green-500/10 active:bg-green-500/20 transition-colors tracking-widest"
                     >
                       ✓ RESTORE SERVICE
                     </button>
@@ -232,7 +233,7 @@ export default function ServiceCard({ service, onSimulateOutage, onRestoreServic
               )}
 
               {/* Last checked timestamp */}
-              <div className="text-[8px] text-white/20 text-right tabular-nums" suppressHydrationWarning>
+              <div className="text-[9px] text-white/20 text-right tabular-nums" suppressHydrationWarning>
                 {service.lastChecked > 0
                   ? `LAST CHECK: ${new Date(service.lastChecked).toLocaleTimeString()}`
                   : 'LAST CHECK: LOADING...'}

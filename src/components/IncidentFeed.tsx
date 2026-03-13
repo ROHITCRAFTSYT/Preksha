@@ -86,10 +86,10 @@ export default function IncidentFeed({ services, incidents }: IncidentFeedProps)
 
   if (list.length === 0) {
     return (
-      <div className="font-mono border border-white/10 p-4 text-center">
-        <div className="text-green-400 text-sm mb-1">✓</div>
-        <div className="text-white/50 text-[10px] tracking-widest">NO ACTIVE INCIDENTS</div>
-        <div className="text-white/20 text-[9px] mt-1">All services operating normally</div>
+      <div className="font-mono border border-white/10 p-6 text-center">
+        <div className="text-green-400 text-base mb-2">✓</div>
+        <div className="text-white/50 text-xs tracking-widest">NO ACTIVE INCIDENTS</div>
+        <div className="text-white/20 text-[10px] mt-1">All services operating normally</div>
       </div>
     );
   }
@@ -103,18 +103,18 @@ export default function IncidentFeed({ services, incidents }: IncidentFeedProps)
         return (
           <div
             key={incident.id}
-            className={`border ${cfg.border} ${cfg.bg} p-2.5 flex gap-2.5 ${isResolved ? 'opacity-50' : ''}`}
+            className={`border ${cfg.border} ${cfg.bg} p-3.5 flex gap-3 ${isResolved ? 'opacity-50' : ''}`}
           >
-            <div className={`flex-shrink-0 text-[10px] ${cfg.color} mt-0.5`}>{cfg.icon}</div>
+            <div className={`flex-shrink-0 text-xs ${cfg.color} mt-0.5`}>{cfg.icon}</div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between gap-2">
-                <span className={`text-[9px] font-bold tracking-widest ${cfg.color}`}>
+                <span className={`text-[10px] font-bold tracking-widest ${cfg.color}`}>
                   {cfg.label}
                   {isResolved && <span className="text-white/30 font-normal ml-1">· RESOLVED</span>}
                 </span>
-                <span className="text-[8px] text-white/30">{displayTime}</span>
+                <span className="text-[9px] text-white/30">{displayTime}</span>
               </div>
-              <p className="text-[9px] text-white/60 mt-0.5 leading-relaxed">{incident.message}</p>
+              <p className="text-[10px] text-white/55 mt-1 leading-relaxed">{incident.message}</p>
             </div>
           </div>
         );

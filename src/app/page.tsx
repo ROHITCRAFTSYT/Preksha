@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { renderCanvas, destroyCanvas } from '@/lib/canvasTrail';
 import { HoverButton } from '@/components/HoverButton';
+import { WavePath } from '@/components/WavePath';
 import { MarqueeAnimation } from '@/components/MarqueeAnimation';
 import { getSession, signOut, supabase } from '@/lib/supabase';
 import type { DbService, DbIncident } from '@/lib/supabase';
@@ -171,11 +172,11 @@ export default function HeroPage() {
         <div className="w-full lg:w-1/2 px-6 lg:px-16 lg:pr-[10%]">
           <div className="max-w-lg relative lg:ml-auto">
 
-            {/* Top decorative line */}
+            {/* Top decorative wave line */}
             <div className="flex items-center gap-2 mb-3 opacity-60">
-              <div className="w-8 h-px bg-white" />
-              <span className="text-green-400 text-[10px] font-mono tracking-wider">■</span>
-              <div className="flex-1 h-px bg-white" />
+              <div className="w-8 h-px bg-white/60 flex-shrink-0" />
+              <span className="text-green-400 text-[10px] font-mono tracking-wider flex-shrink-0">■</span>
+              <WavePath className="text-white/60" />
             </div>
 
             {/* Badge — show username when logged in */}
