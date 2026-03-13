@@ -688,7 +688,7 @@ function Dashboard() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {filteredServices.map((service) => (
                 <ServiceCard
-                  key={`${service.id}-${tick}`}
+                  key={service.id}
                   service={service}
                   onSimulateOutage={handleSimulateOutage}
                   onRestoreService={handleRestoreService}
