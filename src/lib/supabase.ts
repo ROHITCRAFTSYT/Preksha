@@ -101,6 +101,19 @@ export async function signIn(email: string, password: string) {
   return { data, error };
 }
 
+// Google OAuth — redirects browser to Google, then to /api/auth/callback
+export async function signInWithGoogle() {
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: `${origin}/api/auth/callback`,
+      queryParams: { access_type: 'offline', prompt: 'consent' },
+    },
+  });
+  return { data, error };
+}
+
 export async function signOut() {
   const { error } = await supabase.auth.signOut();
   return { error };
