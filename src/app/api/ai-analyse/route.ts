@@ -1,4 +1,3 @@
-import Anthropic from '@anthropic-ai/sdk';
 import { NextRequest, NextResponse } from 'next/server';
 
 export interface AIAnalysis {
@@ -10,11 +9,9 @@ export interface AIAnalysis {
   citizenMessage: string;
 }
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
 export async function POST(req: NextRequest) {
-  if (!process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY === 'your-anthropic-api-key-here') {
-    return NextResponse.json({ error: 'ANTHROPIC_API_KEY not configured' }, { status: 503 });
+  if (!process.env.GROQ_API_KEY || process.env.GROQ_API_KEY === 'your-groq-api-key-here') {
+    return NextResponse.json({ error: 'GROQ_API_KEY not configured' }, { status: 503 });
   }
 
   try {
@@ -58,13 +55,30 @@ Respond with exactly this JSON structure:
   "citizenMessage": "plain-language message for affected citizens (1-2 sentences, no jargon)"
 }`;
 
-    const message = await client.messages.create({
-      model: 'claude-3-5-haiku-20241022',
-      max_tokens: 800,
-      messages: [{ role: 'user', content: prompt }],
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        max_tokens: 800,
+        temperature: 0.3,
+        messages: [{ role: 'user', content: prompt }],
+      }),
     });
 
-    const raw = message.content[0].type === 'text' ? message.content[0].text : '';
+    if (!response.ok) {
+      const errText = await response.text();
+      return NextResponse.json({ error: `Groq API error: ${errText}` }, { status: 500 });
+    }
+
+    const data = await response.json() as {
+      choices: { message: { content: string } }[];
+    };
+
+    const raw = data.choices?.[0]?.message?.content ?? '';
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       return NextResponse.json({ error: 'Invalid response from AI' }, { status: 500 });
