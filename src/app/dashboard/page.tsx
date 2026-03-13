@@ -685,7 +685,7 @@ function Dashboard() {
             </div>
 
             {/* Services grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-start">
               {filteredServices.map((service) => (
                 <ServiceCard
                   key={service.id}
