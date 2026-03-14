@@ -110,6 +110,7 @@ function Dashboard() {
   const [notifPermission, setNotifPermission] = useState<NotificationPermission>('default');
   const [user, setUser] = useState<User | null>(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showAccountSettings, setShowAccountSettings] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const nextPingAtRef = useRef(Date.now() + 60_000);
   const nextRefreshAtRef = useRef(Date.now() + 15_000);
@@ -482,6 +483,118 @@ function Dashboard() {
       {/* ── Glass distortion filter (rendered once, hidden) ─────────────── */}
       <GlassDistortionFilter />
 
+      {/* ── Account Settings Modal ───────────────────────────────────────── */}
+      {showAccountSettings && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)' }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowAccountSettings(false); }}
+        >
+          <div className="w-full max-w-md bg-[#0d0d0d] border border-white/[0.1] shadow-2xl">
+            {/* Modal header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.07]">
+              <div>
+                <div className="text-[11px] text-white/80 font-bold tracking-[0.15em]">ACCOUNT SETTINGS</div>
+                <div className="text-[9px] text-white/25 tracking-widest mt-0.5">MANAGE YOUR PROFILE</div>
+              </div>
+              <button
+                onClick={() => setShowAccountSettings(false)}
+                className="text-white/25 hover:text-white/60 transition-colors text-lg leading-none"
+              >×</button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Profile section */}
+              <div>
+                <div className="text-[9px] text-white/25 tracking-[0.2em] mb-3">PROFILE</div>
+                <div className="flex items-center gap-4 p-4 border border-white/[0.07] bg-white/[0.02]">
+                  <div className="w-12 h-12 rounded-full bg-green-500/20 border border-green-500/30 flex items-center justify-center text-[16px] font-bold text-green-400 flex-shrink-0">
+                    {user?.user_metadata?.full_name
+                      ? user.user_metadata.full_name.split(' ').map((n: string) => n[0]).join('').slice(0,2).toUpperCase()
+                      : user?.email?.[0]?.toUpperCase() ?? '?'}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[13px] font-semibold text-white/90 truncate">
+                      {user?.user_metadata?.full_name ?? 'Unknown User'}
+                    </div>
+                    <div className="text-[10px] text-white/35 truncate mt-0.5">{user?.email}</div>
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <span className="text-[8px] text-green-400/60 tracking-widest border border-green-500/20 px-1.5 py-0.5">FREE PLAN</span>
+                      <span className="text-[8px] text-white/20 tracking-widest">·</span>
+                      <span className="text-[8px] text-white/25 tracking-widest">GOOGLE AUTH</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Account details */}
+              <div>
+                <div className="text-[9px] text-white/25 tracking-[0.2em] mb-3">ACCOUNT DETAILS</div>
+                <div className="space-y-0 border border-white/[0.07]">
+                  {[
+                    { label: 'USER ID', value: user?.id ? user.id.slice(0, 20) + '...' : '—' },
+                    { label: 'PROVIDER', value: 'Google OAuth 2.0' },
+                    { label: 'LAST SIGN IN', value: user?.last_sign_in_at ? new Date(user.last_sign_in_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—' },
+                    { label: 'ACCOUNT CREATED', value: user?.created_at ? new Date(user.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—' },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="flex items-center justify-between px-4 py-2.5 border-b border-white/[0.05] last:border-0">
+                      <span className="text-[9px] text-white/25 tracking-widest">{label}</span>
+                      <span className="text-[10px] text-white/50 font-mono">{value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Notifications */}
+              <div>
+                <div className="text-[9px] text-white/25 tracking-[0.2em] mb-3">NOTIFICATIONS</div>
+                <div className="flex items-center justify-between p-4 border border-white/[0.07] bg-white/[0.02]">
+                  <div>
+                    <div className="text-[11px] text-white/60 font-medium">Browser Alerts</div>
+                    <div className="text-[9px] text-white/25 mt-0.5">Get notified when services go down</div>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      if (notifPermission !== 'granted') {
+                        const perm = await Notification.requestPermission();
+                        setNotifPermission(perm);
+                      } else {
+                        new Notification('🔔 ResilienceOS', { body: 'Alerts are working!' });
+                      }
+                    }}
+                    className={`px-3 py-1.5 text-[9px] font-bold tracking-widest border transition-all ${
+                      notifPermission === 'granted'
+                        ? 'border-green-500/40 text-green-400 bg-green-500/10'
+                        : 'border-white/[0.12] text-white/40 hover:border-white/25 hover:text-white/70'
+                    }`}
+                  >
+                    {notifPermission === 'granted' ? '● ENABLED' : 'ENABLE'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Danger zone */}
+              <div>
+                <div className="text-[9px] text-red-400/40 tracking-[0.2em] mb-3">DANGER ZONE</div>
+                <div className="p-4 border border-red-500/20 bg-red-500/[0.03] space-y-3">
+                  <button
+                    onClick={async () => {
+                      setShowAccountSettings(false);
+                      await signOut();
+                      router.push('/');
+                    }}
+                    className="w-full flex items-center justify-between px-3 py-2.5 text-[10px] text-red-400/60 border border-red-500/20 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/40 transition-all"
+                  >
+                    <span className="tracking-wide">Sign Out of All Devices</span>
+                    <span>↪</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Chaos war-room overlays ──────────────────────────────────────── */}
       <div
         className="fixed inset-0 pointer-events-none z-[5] transition-opacity duration-1000"
@@ -623,7 +736,7 @@ function Dashboard() {
                   {/* Menu items */}
                   <div className="py-1">
                     <button
-                      onClick={() => { setShowUserMenu(false); }}
+                      onClick={() => { setShowUserMenu(false); setShowAccountSettings(true); }}
                       className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[11px] text-white/40 hover:text-white/80 hover:bg-white/[0.04] transition-all text-left"
                     >
                       <span className="text-[12px]">⚙</span>
