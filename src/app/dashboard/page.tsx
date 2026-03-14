@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState, useCallback, useRef, Suspense, useMemo } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import ServiceCard from '@/components/ServiceCard';
 import IncidentFeed from '@/components/IncidentFeed';
@@ -9,8 +9,9 @@ import GlassCategoryButton, { GlassDistortionFilter } from '@/components/GlassCa
 import GlowCard from '@/components/GlowCard';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/Tooltip';
 import { dbToGovService, simulateChaos, INITIAL_SERVICES, type GovService } from '@/lib/services';
-import { supabase } from '@/lib/supabase';
+import { supabase, signOut } from '@/lib/supabase';
 import type { DbService, DbIncident, DbHealthCheck } from '@/lib/supabase';
+import type { User } from '@supabase/supabase-js';
 
 type Tab = 'services' | 'events' | 'chaos';
 
@@ -90,6 +91,7 @@ function StatCard({ label, value, sub, color, pulse, glowColor = 'white' }: {
 
 function Dashboard() {
   const searchParams = useSearchParams();
+  const router = useRouter();
 
   const [activeTab, setActiveTab] = useState<Tab>('services');
   const [services, setServices] = useState<GovService[]>(INITIAL_SERVICES);
@@ -106,6 +108,9 @@ function Dashboard() {
   const [countdown, setCountdown] = useState(15);
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
   const [notifPermission, setNotifPermission] = useState<NotificationPermission>('default');
+  const [user, setUser] = useState<User | null>(null);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
   const nextPingAtRef = useRef(Date.now() + 60_000);
   const nextRefreshAtRef = useRef(Date.now() + 15_000);
   const latencyHistoryRef = useRef<Record<string, number[]>>({});
@@ -291,6 +296,26 @@ function Dashboard() {
       setIsChecking(false);
     }
   }, [isChecking, loadServices, loadIncidents, loadHealthHistory]);
+
+  // ── Load current user ──────────────────────────────────────────────────────
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setUser(data.user));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+      setUser(session?.user ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // ── Close user menu on outside click ───────────────────────────────────────
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setShowUserMenu(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // ── Initial load ───────────────────────────────────────────────────────────
   useEffect(() => {
@@ -556,6 +581,116 @@ function Dashboard() {
             >
               ⚡ {chaosMode ? 'EXIT CHAOS' : 'CHAOS'}
             </button>
+
+            {/* User account dropdown */}
+            <div ref={userMenuRef} className="relative">
+              <button
+                onClick={() => setShowUserMenu(v => !v)}
+                className="flex items-center gap-2 px-2 py-1.5 border border-white/[0.08] hover:border-white/20 transition-all group"
+              >
+                {/* Avatar */}
+                <div className="w-5 h-5 rounded-full bg-green-500/20 border border-green-500/30 flex items-center justify-center text-[9px] font-bold text-green-400">
+                  {user?.user_metadata?.full_name
+                    ? user.user_metadata.full_name.split(' ').map((n: string) => n[0]).join('').slice(0,2).toUpperCase()
+                    : user?.email?.[0]?.toUpperCase() ?? '?'}
+                </div>
+                <span className="text-[10px] text-white/40 group-hover:text-white/60 hidden sm:inline tracking-widest max-w-[80px] truncate">
+                  {user?.user_metadata?.full_name?.split(' ')[0] ?? user?.email?.split('@')[0] ?? 'ACCOUNT'}
+                </span>
+                <span className={`text-[9px] text-white/25 transition-transform duration-200 ${showUserMenu ? 'rotate-180' : ''}`}>▾</span>
+              </button>
+
+              {showUserMenu && (
+                <div className="absolute right-0 top-full mt-1.5 w-56 bg-[#0d0d0d] border border-white/[0.1] shadow-xl z-50">
+                  {/* Account info */}
+                  <div className="px-4 py-3 border-b border-white/[0.07]">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-full bg-green-500/20 border border-green-500/30 flex items-center justify-center text-[11px] font-bold text-green-400 flex-shrink-0">
+                        {user?.user_metadata?.full_name
+                          ? user.user_metadata.full_name.split(' ').map((n: string) => n[0]).join('').slice(0,2).toUpperCase()
+                          : user?.email?.[0]?.toUpperCase() ?? '?'}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-[11px] font-medium text-white/80 truncate">
+                          {user?.user_metadata?.full_name ?? 'User'}
+                        </div>
+                        <div className="text-[9px] text-white/30 truncate">{user?.email}</div>
+                        <div className="text-[8px] text-green-400/50 tracking-widest mt-0.5">FREE PLAN</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Menu items */}
+                  <div className="py-1">
+                    <button
+                      onClick={() => { setShowUserMenu(false); }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[11px] text-white/40 hover:text-white/80 hover:bg-white/[0.04] transition-all text-left"
+                    >
+                      <span className="text-[12px]">⚙</span>
+                      <span className="tracking-wide">Account Settings</span>
+                    </button>
+
+                    <button
+                      onClick={() => { setShowUserMenu(false); router.push('/status'); }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[11px] text-white/40 hover:text-white/80 hover:bg-white/[0.04] transition-all text-left"
+                    >
+                      <span className="text-[12px]">↗</span>
+                      <span className="tracking-wide">View Status Page</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setShowUserMenu(false);
+                        if (notifPermission !== 'granted') {
+                          Notification.requestPermission().then(p => setNotifPermission(p));
+                        } else {
+                          new Notification('🔔 ResilienceOS', { body: 'Alerts are active.' });
+                        }
+                      }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[11px] text-white/40 hover:text-white/80 hover:bg-white/[0.04] transition-all text-left"
+                    >
+                      <span className="text-[12px]">{notifPermission === 'granted' ? '🔔' : '🔕'}</span>
+                      <span className="tracking-wide">{notifPermission === 'granted' ? 'Alerts Active' : 'Enable Alerts'}</span>
+                      {notifPermission === 'granted' && (
+                        <span className="ml-auto text-[8px] text-green-400/60 tracking-widest">ON</span>
+                      )}
+                    </button>
+                  </div>
+
+                  <div className="border-t border-white/[0.07] py-1">
+                    <button
+                      onClick={async () => {
+                        setShowUserMenu(false);
+                        await signOut();
+                        await supabase.auth.signInWithOAuth({
+                          provider: 'google',
+                          options: {
+                            redirectTo: `${window.location.origin}/auth/callback`,
+                            queryParams: { prompt: 'select_account' },
+                          },
+                        });
+                      }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[11px] text-white/40 hover:text-white/80 hover:bg-white/[0.04] transition-all text-left"
+                    >
+                      <span className="text-[12px]">⇄</span>
+                      <span className="tracking-wide">Switch Account</span>
+                    </button>
+
+                    <button
+                      onClick={async () => {
+                        setShowUserMenu(false);
+                        await signOut();
+                        router.push('/');
+                      }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[11px] text-red-400/50 hover:text-red-400 hover:bg-red-500/[0.06] transition-all text-left"
+                    >
+                      <span className="text-[12px]">↪</span>
+                      <span className="tracking-wide">Sign Out</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </header>
