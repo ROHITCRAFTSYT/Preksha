@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Features } from "@/components/Features";
 import { ShootingStars } from "@/components/ShootingStars";
+import { TechCarousel } from "@/components/TechCarousel";
 
 export const metadata = {
   title: "Features — ResilienceOS",
@@ -109,6 +110,9 @@ export default function FeaturesPage() {
       {/* Features section + footer — z-10 keeps them above the star layer */}
       <div className="relative z-10">
         <Features />
+
+        {/* Tech + Services Carousel */}
+        <TechCarousel />
 
         {/* Footer */}
         <div className="border-t border-white/10 px-4 py-6 text-center">
