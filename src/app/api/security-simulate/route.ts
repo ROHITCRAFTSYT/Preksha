@@ -125,15 +125,44 @@ export async function POST(req: NextRequest) {
       // No body or invalid JSON — use defaults
     }
 
+    // Fetch active defenses
+    const { data: defenses } = await supabase
+      .from('active_defenses')
+      .select('*')
+      .eq('status', 'active');
+
+    const activeDefenses = defenses ?? [];
+
     const events = Array.from({ length: count }, () => {
       const scenario = pickScenario(attackTypes);
-      const details  = scenario.detailsFn();
+      const details  = scenario.detailsFn() as Record<string, unknown>;
+      
+      const userId = randomItem(FAKE_USERS);
+      const ipAddress = randomItem(FAKE_IPS);
+      const eventType = scenario.event_type;
+      
+      let riskScore = riskFor(eventType, details);
+      
+      // Check active defenses
+      const matchingDefense = activeDefenses.find(d => 
+        (d.target_type === 'ip' && d.target_value === ipAddress) ||
+        (d.target_type === 'user' && d.target_value === userId) ||
+        (d.target_type === 'attack_type' && d.target_value === eventType)
+      );
+
+      if (matchingDefense) {
+        riskScore = 0;
+        details.mitigated = true;
+        details.mitigated_by = matchingDefense.action;
+        details.mitigation_target = matchingDefense.target_value;
+      }
+
       return {
-        user_id:    randomItem(FAKE_USERS),
-        event_type: scenario.event_type,
-        ip_address: randomItem(FAKE_IPS),
+        user_id:    userId,
+        event_type: eventType,
+        ip_address: ipAddress,
         device_id:  randomItem(FAKE_DEVICES),
-        risk_score: riskFor(scenario.event_type, details as Record<string, unknown>),
+        risk_score: riskScore,
         details,
       };
     });

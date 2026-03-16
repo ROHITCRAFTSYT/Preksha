@@ -206,6 +206,41 @@ create trigger security_incidents_updated_at
   for each row execute function update_updated_at();
 
 -- ─────────────────────────────────────────────────────────────────────────────
+-- STEP 6f ─ active_defenses  (active mitigations)
+-- ─────────────────────────────────────────────────────────────────────────────
+drop table if exists public.active_defenses cascade;
+
+create table public.active_defenses (
+  id           uuid        primary key default gen_random_uuid(),
+  target_type  text        not null, -- e.g., 'ip', 'user_id', 'endpoint'
+  target_value text        not null, -- e.g., '192.168.1.5', '/api/login'
+  action       text        not null, -- e.g., 'block', 'rate_limit', 'require_mfa'
+  status       text        not null default 'active', -- 'active' or 'inactive'
+  created_at   timestamptz not null default now(),
+  expires_at   timestamptz
+);
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- STEP 6g ─ security_reports  (post-incident reports)
+-- ─────────────────────────────────────────────────────────────────────────────
+drop table if exists public.security_reports cascade;
+
+create table public.security_reports (
+  id           uuid        primary key default gen_random_uuid(),
+  incident_id  uuid        references public.security_incidents(id) on delete cascade,
+  title        text        not null,
+  content      text        not null, -- markdown report
+  created_at   timestamptz not null default now()
+);
+
+alter table public.security_incidents replica identity full;
+create index security_incidents_status on public.security_incidents (status, created_at desc);
+
+create trigger security_incidents_updated_at
+  before update on public.security_incidents
+  for each row execute function update_updated_at();
+
+-- ─────────────────────────────────────────────────────────────────────────────
 -- STEP 7 ─ auto-update updated_at trigger
 -- ─────────────────────────────────────────────────────────────────────────────
 create or replace function update_updated_at()
@@ -252,6 +287,14 @@ begin
   begin
     alter publication supabase_realtime add table public.security_incidents;
   exception when others then null; end;
+
+  begin
+    alter publication supabase_realtime add table public.active_defenses;
+  exception when others then null; end;
+
+  begin
+    alter publication supabase_realtime add table public.security_reports;
+  exception when others then null; end;
 end $$;
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -267,6 +310,8 @@ alter table public.security_events enable row level security;
 alter table public.security_alerts enable row level security;
 alter table public.security_incidents enable row level security;
 alter table public.remediation_playbooks enable row level security;
+alter table public.active_defenses enable row level security;
+alter table public.security_reports enable row level security;
 
 -- Public: anyone can read services, incidents, health_checks, plans
 create policy "Public read services"
@@ -292,6 +337,12 @@ create policy "Public read security_incidents"
 
 create policy "Public read remediation_playbooks"
   on public.remediation_playbooks for select using (true);
+
+create policy "Public read active_defenses"
+  on public.active_defenses for select using (true);
+
+create policy "Public read security_reports"
+  on public.security_reports for select using (true);
 
 -- Users: read/update only their own profile
 create policy "Users read own profile"

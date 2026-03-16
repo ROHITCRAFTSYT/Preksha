@@ -6,14 +6,18 @@ import AlertFeed from '@/components/AlertFeed';
 import IncidentManager from '@/components/IncidentManager';
 import PlaybookViewer from '@/components/PlaybookViewer';
 import ThreatTaxonomy from '@/components/ThreatTaxonomy';
+import ActiveDefenses from '@/components/ActiveDefenses';
+import ReportViewer from '@/components/ReportViewer';
 
-type SecurityTab = 'overview' | 'monitor' | 'alerts' | 'incidents' | 'playbooks' | 'taxonomy';
+type SecurityTab = 'overview' | 'monitor' | 'alerts' | 'incidents' | 'defenses' | 'reports' | 'playbooks' | 'taxonomy';
 
 const TABS: { id: SecurityTab; label: string; icon: string }[] = [
   { id: 'overview',  label: 'OVERVIEW',  icon: '◎' },
   { id: 'monitor',   label: 'MONITOR',   icon: '⚡' },
   { id: 'alerts',    label: 'ALERTS',    icon: '🔔' },
   { id: 'incidents', label: 'INCIDENTS', icon: '📋' },
+  { id: 'defenses',  label: 'DEFENSES',  icon: '🛡' },
+  { id: 'reports',   label: 'REPORTS',   icon: '📄' },
   { id: 'playbooks', label: 'PLAYBOOKS', icon: '📖' },
   { id: 'taxonomy',  label: 'TAXONOMY',  icon: '🔬' },
 ];
@@ -49,6 +53,8 @@ export default function SecurityDashboard() {
       {activeTab === 'monitor' && <CyberThreatMonitor />}
       {activeTab === 'alerts' && <AlertFeed />}
       {activeTab === 'incidents' && <IncidentManager />}
+      {activeTab === 'defenses' && <ActiveDefenses />}
+      {activeTab === 'reports' && <ReportViewer />}
       {activeTab === 'playbooks' && <PlaybookViewer />}
       {activeTab === 'taxonomy' && <ThreatTaxonomy />}
     </div>

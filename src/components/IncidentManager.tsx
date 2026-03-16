@@ -43,6 +43,8 @@ export default function IncidentManager() {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [isAnalyzing, setIsAnalyzing] = useState<string | null>(null);
+  const [isReporting, setIsReporting] = useState<string | null>(null);
 
   const loadIncidents = useCallback(async () => {
     const { data } = await supabase
@@ -71,6 +73,63 @@ export default function IncidentManager() {
     });
     await loadIncidents();
   }, [loadIncidents]);
+
+  const runAnalysis = async (id: string) => {
+    setIsAnalyzing(id);
+    try {
+      const res = await fetch('/api/security-incident-analyse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ incident_id: id }),
+      });
+      const data = await res.json();
+      if (data.analysis) {
+        await transitionStatus(id, incidents.find(i => i.id === id)?.status ?? 'investigating', `AI Analysis: ${data.analysis.substring(0, 50)}...`);
+        // We just add it to the timeline by calling transitionStatus with the same status but a new note
+      }
+    } finally {
+      setIsAnalyzing(null);
+    }
+  };
+
+  const generateReport = async (inc: Incident) => {
+    setIsReporting(inc.id);
+    try {
+      // Create a basic report from timeline
+      const content = `
+# Incident Report: ${inc.title}
+**Severity:** ${inc.severity.toUpperCase()}
+**Status:** ${inc.status.toUpperCase()}
+**Created:** ${new Date(inc.created_at).toLocaleString()}
+**Closed:** ${inc.closed_at ? new Date(inc.closed_at).toLocaleString() : 'N/A'}
+
+## Description
+${inc.description || 'No description provided.'}
+
+## Timeline
+${inc.timeline.map(t => `- **${new Date(t.timestamp).toLocaleString()}** [${t.status.toUpperCase()}] ${t.note}`).join('\n')}
+
+## Associated Alerts
+${inc.alert_ids.length} alerts linked to this incident.
+
+## Post-Incident Actions
+*Generated automatically by ResilienceOS SOC.*
+      `.trim();
+
+      await fetch('/api/security-reports', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          incident_id: inc.id,
+          title: `PIR: ${inc.title}`,
+          content
+        }),
+      });
+      alert('Post-Incident Report generated successfully. Check the Reports tab.');
+    } finally {
+      setIsReporting(null);
+    }
+  };
 
   const filtered = incidents.filter(i => statusFilter === 'all' || i.status === statusFilter);
 
@@ -181,14 +240,51 @@ export default function IncidentManager() {
                     </div>
                   </div>
 
+                  {/* AI & Reporting Actions */}
+                  <div className="flex gap-2 pt-2 mt-2 border-t border-white/[0.05]">
+                    {inc.status !== 'closed' && (
+                      <button
+                        onClick={() => runAnalysis(inc.id)}
+                        disabled={isAnalyzing === inc.id}
+                        className="px-3 py-1.5 text-[9px] font-bold tracking-widest border border-purple-500/30 text-purple-400 hover:bg-purple-500/10 transition-colors disabled:opacity-50"
+                      >
+                        {isAnalyzing === inc.id ? 'ANALYZING...' : '✨ AI ANALYSE'}
+                      </button>
+                    )}
+                    {inc.status === 'closed' && (
+                      <button
+                        onClick={() => generateReport(inc)}
+                        disabled={isReporting === inc.id}
+                        className="px-3 py-1.5 text-[9px] font-bold tracking-widest border border-blue-500/30 text-blue-400 hover:bg-blue-500/10 transition-colors disabled:opacity-50"
+                      >
+                        {isReporting === inc.id ? 'GENERATING...' : '📄 GENERATE PIR'}
+                      </button>
+                    )}
+                  </div>
+
                   {/* Actions */}
                   {nextStatus && (
-                    <div className="flex gap-2">
-                      <button
+                    <div className="flex gap-2 mt-2">
+                       <button
                         onClick={() => transitionStatus(inc.id, nextStatus)}
-                        className="px-4 py-2 text-[10px] font-bold tracking-widest border border-purple-500/40 text-purple-400 hover:bg-purple-500/10 transition-colors"
+                        className="px-4 py-2 text-[10px] font-bold tracking-widest border border-purple-500/40 text-purple-400 bg-purple-500/[0.05] hover:bg-purple-500/10 transition-colors"
                       >
                         → TRANSITION TO {nextStatus.toUpperCase()}
+                      </button>
+                      <button
+                        onClick={() => {
+                          const ip = prompt('Enter IP or User ID to block:');
+                          if(ip) {
+                            fetch('/api/security-defenses', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ target_type: ip.includes('.') ? 'ip' : 'user', target_value: ip, action: 'block' })
+                            }).then(() => alert('Defense rule created. Check Defenses tab.'));
+                          }
+                        }}
+                        className="px-3 py-2 text-[10px] tracking-widest border border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10 transition-colors"
+                      >
+                        🛡 QUICK BLOCK
                       </button>
                       {inc.status !== 'closed' && (
                         <button
