@@ -357,6 +357,7 @@ export default function CyberThreatMonitor() {
   const [activeFilter, setActiveFilter] = useState<string>('ALL');
   const [newEventIds, setNewEventIds] = useState<Set<string>>(new Set());
   const [clearing, setClearing] = useState(false);
+  const [isLiveBattle, setIsLiveBattle] = useState(false);
   const prevEventCount = useRef(0);
 
   // ── Load events ─────────────────────────────────────────────────────────────
@@ -439,7 +440,30 @@ export default function CyberThreatMonitor() {
     }
   }, [loadEvents]);
 
-  // ── Clear all events ────────────────────────────────────────────────────────
+  // ── Auto-Pilot (Live Battle) ────────────────────────────────────────────────
+  useEffect(() => {
+    if (!isLiveBattle) return;
+    
+    // Fire an attack every 2.5 to 5 seconds
+    const intervalId = setInterval(() => {
+      // Pick 1-2 random attack types
+      const shuffled = [...ALL_ATTACK_TYPES].sort(() => 0.5 - Math.random());
+      const selectedTypes = shuffled.slice(0, Math.floor(Math.random() * 2) + 1);
+      
+      fetch('/api/security-simulate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          attack_types: selectedTypes,
+          count: Math.floor(Math.random() * 3) + 1, // small bursts
+        }),
+      }).catch(console.error); // Silently catch to not spam console
+      
+    }, Math.floor(Math.random() * 2500) + 2500);
+
+    return () => clearInterval(intervalId);
+  }, [isLiveBattle]);
+
   const clearAllEvents = useCallback(async () => {
     setClearing(true);
     try {
@@ -451,12 +475,27 @@ export default function CyberThreatMonitor() {
     }
   }, []);
 
+  // ── Quick apply defense ───────────────────────────────────────────────────
+  const handleQuickBlock = async (targetType: string, targetValue: string) => {
+    try {
+      await fetch('/api/security-defenses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target_type: targetType, target_value: targetValue, action: 'block' }),
+      });
+      // Optional: show a small success indication or wait for the next mitigated events
+    } catch (err) {
+      console.error('Failed to quick block', err);
+    }
+  };
+
   // ── Derived stats ───────────────────────────────────────────────────────────
-  const activeThreats      = events.filter(e => e.risk_score >= 65).length;
-  const criticalCount      = events.filter(e => e.risk_score >= 85).length;
+  const activeThreats      = events.filter(e => e.risk_score >= 65 && !e.details?.mitigated).length;
+  const criticalCount      = events.filter(e => e.risk_score >= 85 && !e.details?.mitigated).length;
   const bruteForceCount    = events.filter(e => e.event_type === 'brute_force_login').length;
   const abnormalDownloads  = events.filter(e => e.event_type === 'document_download').length;
   const tokenHijacks       = events.filter(e => e.event_type === 'token_hijack_attempt').length;
+  const blockedCount       = events.filter(e => e.details?.mitigated).length;
 
   const filters = ['ALL', 'document_download', 'brute_force_login', 'token_hijack_attempt', 'api_abuse', 'suspicious_login'];
   const filteredEvents = activeFilter === 'ALL' ? events : events.filter(e => e.event_type === activeFilter);
@@ -486,20 +525,40 @@ export default function CyberThreatMonitor() {
         </div>
 
         {/* ── Attack Configuration Panel ──────────────────────────────────── */}
-        <AttackConfigPanel
-          onLaunch={launchAttack}
-          simulating={simulating}
-          waveInfo={waveInfo}
-        />
+        <div className="flex gap-2 mb-4 w-full">
+          <div className="flex-1">
+            <AttackConfigPanel onLaunch={launchAttack} simulating={simulating || isLiveBattle} waveInfo={waveInfo} />
+          </div>
+          <button
+            onClick={() => setIsLiveBattle(!isLiveBattle)}
+            className={`w-32 flex flex-col items-center justify-center border transition-all relative overflow-hidden ${
+              isLiveBattle 
+                ? 'border-red-500 text-red-400 bg-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.3)]' 
+                : 'border-white/10 text-white/40 hover:text-white/80 hover:bg-white/[0.05] hover:border-white/20'
+            }`}
+          >
+            {isLiveBattle && (
+              <div
+                className="absolute inset-0 bg-red-500/10"
+                style={{ animation: 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite' }}
+              />
+            )}
+            <span className="text-xl relative z-10">{isLiveBattle ? '🔥' : '⚔️'}</span>
+            <span className="text-[9px] font-bold tracking-widest mt-1 relative z-10 text-center">
+              {isLiveBattle ? 'STOP AUTO-PILOT' : 'LIVE BATTLE\nAUTO-PILOT'}
+            </span>
+          </button>
+        </div>
 
         {/* ── Stat cards ─────────────────────────────────────────────────── */}
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
+        <div className="grid grid-cols-3 lg:grid-cols-6 gap-2">
           {[
             { label: 'ACTIVE THREATS',       value: activeThreats,     color: activeThreats > 0 ? 'text-red-400' : 'text-white/30',    pulse: activeThreats > 0 },
             { label: 'CRITICAL ALERTS',       value: criticalCount,     color: criticalCount > 0 ? 'text-red-400' : 'text-white/30',    pulse: criticalCount > 0 },
+            { label: 'BLOCKED EVENTS',        value: blockedCount,      color: blockedCount > 0 ? 'text-purple-400' : 'text-white/30',  pulse: false },
             { label: 'BRUTE FORCE',           value: bruteForceCount,   color: bruteForceCount > 0 ? 'text-orange-400' : 'text-white/30', pulse: false },
             { label: 'ABNORMAL DOWNLOADS',    value: abnormalDownloads, color: abnormalDownloads > 0 ? 'text-orange-400' : 'text-white/30', pulse: false },
-            { label: 'TOKEN HIJACK ATTEMPTS', value: tokenHijacks,      color: tokenHijacks > 0 ? 'text-purple-400' : 'text-white/30',  pulse: tokenHijacks > 0 },
+            { label: 'TOKEN HIJACKS',         value: tokenHijacks,      color: tokenHijacks > 0 ? 'text-purple-400' : 'text-white/30',  pulse: tokenHijacks > 0 },
           ].map(({ label, value, color, pulse }) => (
             <div key={label} className="border border-white/[0.07] bg-white/[0.02] p-3 flex flex-col gap-1">
               <div className="text-[8px] text-white/20 tracking-[0.2em]">{label}</div>
@@ -591,13 +650,19 @@ export default function CyberThreatMonitor() {
                       {/* Main info */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className={`text-[10px] font-bold tracking-wide ${meta.color}`}>{meta.label}</span>
-                          <span className={`text-[8px] font-bold tracking-widest px-1.5 py-0.5 border ${
-                            risk.label === 'CRITICAL' ? 'border-red-500/40 bg-red-500/10 text-red-400' :
-                            risk.label === 'HIGH'     ? 'border-orange-500/40 bg-orange-500/10 text-orange-400' :
-                            risk.label === 'MEDIUM'   ? 'border-yellow-500/40 bg-yellow-500/10 text-yellow-400' :
-                                                        'border-green-500/40 bg-green-500/10 text-green-400'
-                          }`}>{risk.label}</span>
+                          <span className={`text-[10px] font-bold tracking-wide ${ev.details?.mitigated ? 'text-white/40 line-through' : meta.color}`}>{meta.label}</span>
+                          {ev.details?.mitigated ? (
+                             <span className="text-[8px] font-bold tracking-widest px-1.5 py-0.5 border border-purple-500/40 bg-purple-500/10 text-purple-400">
+                               DEFENSE ACTIVE: BLOCKED
+                             </span>
+                          ) : (
+                            <span className={`text-[8px] font-bold tracking-widest px-1.5 py-0.5 border ${
+                              risk.label === 'CRITICAL' ? 'border-red-500/40 bg-red-500/10 text-red-400' :
+                              risk.label === 'HIGH'     ? 'border-orange-500/40 bg-orange-500/10 text-orange-400' :
+                              risk.label === 'MEDIUM'   ? 'border-yellow-500/40 bg-yellow-500/10 text-yellow-400' :
+                                                          'border-green-500/40 bg-green-500/10 text-green-400'
+                            }`}>{risk.label}</span>
+                          )}
                           {isNew && (
                             <span className="text-[8px] text-purple-400 tracking-widest animate-pulse">● LIVE</span>
                           )}
@@ -623,15 +688,33 @@ export default function CyberThreatMonitor() {
                         )}
                       </div>
 
-                      {/* Right side */}
-                      <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                        <RiskBar score={ev.risk_score} />
-                        <button
-                          onClick={() => setAnalysisEvent(ev)}
-                          className="px-2 py-1 text-[9px] text-purple-400/60 border border-purple-500/20 hover:bg-purple-500/10 hover:text-purple-400 hover:border-purple-500/40 transition-all tracking-widest"
-                        >
-                          ⚡ ANALYSE
-                        </button>
+                      {/* Right side - Actions */}
+                      <div className="flex flex-col items-end justify-between gap-2 flex-shrink-0">
+                        {ev.details?.mitigated ? (
+                          <div className="text-[10px] text-purple-400/60 font-medium tracking-widest border border-purple-500/20 px-2 py-0.5 mt-0.5">
+                            MITIGATED
+                          </div>
+                        ) : (
+                          <RiskBar score={ev.risk_score} />
+                        )}
+                        
+                        <div className="flex gap-1 mt-auto">
+                          {!ev.details?.mitigated && ev.risk_score >= 65 && (
+                            <button
+                              onClick={() => handleQuickBlock('ip', ev.ip_address)}
+                              className="px-2 py-1 text-[9px] text-red-400/80 font-bold border border-red-500/30 hover:bg-red-500/10 transition-all tracking-widest"
+                              title="Instantly block this IP address"
+                            >
+                              BLOCK IP
+                            </button>
+                          )}
+                          <button
+                            onClick={() => setAnalysisEvent(ev)}
+                            className="px-2 py-1 text-[9px] text-purple-400/60 border border-purple-500/20 hover:bg-purple-500/10 hover:text-purple-400 hover:border-purple-500/40 transition-all tracking-widest"
+                          >
+                            ⚡ ANALYSE
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );
