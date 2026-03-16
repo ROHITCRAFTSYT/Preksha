@@ -108,6 +108,7 @@ function Dashboard() {
   const [recentChecks, setRecentChecks] = useState<RecentCheck[]>([]);
   const [countdown, setCountdown] = useState(15);
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
+  const [securityStats, setSecurityStats] = useState({ threats: 0, critical: 0, bruteForce: 0, tokenHijacks: 0 });
   const [notifPermission, setNotifPermission] = useState<NotificationPermission>('default');
   const [user, setUser] = useState<User | null>(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -419,6 +420,23 @@ function Dashboard() {
     const hcInterval = setInterval(triggerHealthCheck, 60_000);
     return () => clearInterval(hcInterval);
   }, [triggerHealthCheck]);
+
+  // ── Security stats fetch (runs when security tab is active) ───────────────
+  useEffect(() => {
+    if (activeTab !== 'security') return;
+    fetch('/api/security-events')
+      .then((r) => r.json())
+      .then(({ events }) => {
+        if (!Array.isArray(events)) return;
+        setSecurityStats({
+          threats:     events.filter((e: { risk_score: number }) => e.risk_score >= 70).length,
+          critical:    events.filter((e: { risk_score: number }) => e.risk_score >= 90).length,
+          bruteForce:  events.filter((e: { event_type: string }) => e.event_type === 'brute_force_login').length,
+          tokenHijacks:events.filter((e: { event_type: string }) => e.event_type === 'token_hijack_attempt').length,
+        });
+      })
+      .catch(() => {});
+  }, [activeTab]);
 
   // ── Chaos handlers ─────────────────────────────────────────────────────────
   const handleSimulateOutage = useCallback(async (id: string) => {
@@ -1040,33 +1058,71 @@ function Dashboard() {
 
             {/* ── Stat cards ───────────────────────────────────────────── */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              <StatCard
-                label="Services"
-                value={services.length}
-                sub={filter !== 'ALL' ? `${filteredServices.length} shown` : 'monitored'}
-                color="text-white"
-                glowColor="white"
-              />
-              <StatCard
-                label="Avg Uptime"
-                value={`${avgUptime.toFixed(1)}%`}
-                color={uptimeColor}
-                glowColor={avgUptime >= 99.5 ? 'green' : avgUptime >= 95 ? 'orange' : 'red'}
-              />
-              <StatCard
-                label="Avg Latency"
-                value={stats.avgLatency > 0 ? `${stats.avgLatency}ms` : '—'}
-                sub="last 24h"
-                color={latencyColor}
-                glowColor={stats.avgLatency === 0 ? 'white' : stats.avgLatency > 800 ? 'red' : stats.avgLatency > 400 ? 'orange' : 'blue'}
-              />
-              <StatCard
-                label="Active Incidents"
-                value={activeIncidentCount}
-                color={activeIncidentCount > 0 ? 'text-red-400' : 'text-green-400'}
-                pulse={activeIncidentCount > 0}
-                glowColor={activeIncidentCount > 0 ? 'red' : 'green'}
-              />
+              {activeTab === 'security' ? (
+                <>
+                  <StatCard
+                    label="Active Threats"
+                    value={securityStats.threats}
+                    sub="risk ≥ 70"
+                    color={securityStats.threats > 0 ? 'text-red-400' : 'text-green-400'}
+                    pulse={securityStats.threats > 0}
+                    glowColor={securityStats.threats > 0 ? 'red' : 'green'}
+                  />
+                  <StatCard
+                    label="Critical Alerts"
+                    value={securityStats.critical}
+                    sub="risk ≥ 90"
+                    color={securityStats.critical > 0 ? 'text-red-400' : 'text-white'}
+                    pulse={securityStats.critical > 0}
+                    glowColor={securityStats.critical > 0 ? 'red' : 'white'}
+                  />
+                  <StatCard
+                    label="Brute Force"
+                    value={securityStats.bruteForce}
+                    sub="login attempts"
+                    color={securityStats.bruteForce > 0 ? 'text-orange-400' : 'text-white'}
+                    glowColor={securityStats.bruteForce > 0 ? 'orange' : 'white'}
+                  />
+                  <StatCard
+                    label="Token Hijacks"
+                    value={securityStats.tokenHijacks}
+                    sub="OAuth attacks"
+                    color={securityStats.tokenHijacks > 0 ? 'text-red-400' : 'text-white'}
+                    pulse={securityStats.tokenHijacks > 0}
+                    glowColor={securityStats.tokenHijacks > 0 ? 'red' : 'white'}
+                  />
+                </>
+              ) : (
+                <>
+                  <StatCard
+                    label="Services"
+                    value={services.length}
+                    sub={filter !== 'ALL' ? `${filteredServices.length} shown` : 'monitored'}
+                    color="text-white"
+                    glowColor="white"
+                  />
+                  <StatCard
+                    label="Avg Uptime"
+                    value={`${avgUptime.toFixed(1)}%`}
+                    color={uptimeColor}
+                    glowColor={avgUptime >= 99.5 ? 'green' : avgUptime >= 95 ? 'orange' : 'red'}
+                  />
+                  <StatCard
+                    label="Avg Latency"
+                    value={stats.avgLatency > 0 ? `${stats.avgLatency}ms` : '—'}
+                    sub="last 24h"
+                    color={latencyColor}
+                    glowColor={stats.avgLatency === 0 ? 'white' : stats.avgLatency > 800 ? 'red' : stats.avgLatency > 400 ? 'orange' : 'blue'}
+                  />
+                  <StatCard
+                    label="Active Incidents"
+                    value={activeIncidentCount}
+                    color={activeIncidentCount > 0 ? 'text-red-400' : 'text-green-400'}
+                    pulse={activeIncidentCount > 0}
+                    glowColor={activeIncidentCount > 0 ? 'red' : 'green'}
+                  />
+                </>
+              )}
             </div>
 
             {/* ── Tab: Services ─────────────────────────────────────────── */}
