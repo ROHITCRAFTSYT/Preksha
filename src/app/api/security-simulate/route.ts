@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
@@ -9,10 +9,11 @@ const supabase = createClient(
 const FAKE_IPS = [
   '185.220.101.47', '45.142.212.100', '103.21.244.0',
   '162.158.62.14',  '198.51.100.42',  '91.108.4.0',
+  '77.88.55.60',    '5.188.210.227',  '171.25.193.9',
 ];
 
-const FAKE_DEVICES = ['dev_mobile_IN', 'dev_unknown_CN', 'dev_tablet_RU', 'dev_pc_US', 'dev_bot_XX'];
-const FAKE_USERS   = ['uid_anon_1', 'uid_anon_2', 'digilocker_user_8821', 'uid_unknown'];
+const FAKE_DEVICES = ['dev_mobile_IN', 'dev_unknown_CN', 'dev_tablet_RU', 'dev_pc_US', 'dev_bot_XX', 'dev_iot_KR'];
+const FAKE_USERS   = ['uid_anon_1', 'uid_anon_2', 'digilocker_user_8821', 'uid_unknown', 'uid_scraper_bot'];
 
 function randomItem<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
@@ -24,9 +25,10 @@ const ATTACK_SCENARIOS = [
     event_type: 'document_download',
     weight: 30,
     detailsFn: () => ({
-      document_type: randomItem(['aadhaar', 'pan_card', 'driving_license', 'degree_cert']),
+      document_type: randomItem(['aadhaar', 'pan_card', 'driving_license', 'degree_cert', 'voter_id']),
       count_in_window: Math.floor(Math.random() * 18) + 8,
       window_seconds: 60,
+      exfiltration_method: randomItem(['bulk_api', 'scraping', 'automated_download']),
     }),
   },
   {
@@ -36,6 +38,7 @@ const ATTACK_SCENARIOS = [
       attempts: Math.floor(Math.random() * 40) + 10,
       target_email: `user${Math.floor(Math.random() * 9000) + 1000}@gov.in`,
       last_attempt: new Date().toISOString(),
+      proxy_chain: Math.random() > 0.5 ? randomItem(['TOR', 'residential_proxy', 'datacenter_vpn']) : null,
     }),
   },
   {
@@ -43,17 +46,19 @@ const ATTACK_SCENARIOS = [
     weight: 20,
     detailsFn: () => ({
       token_type: 'DigiLocker OAuth Bearer',
-      origin: randomItem(['185.220.101.47', '91.108.4.0', 'unknown']),
+      origin: randomItem(['185.220.101.47', '91.108.4.0', 'unknown', '5.188.210.227']),
       forged_signature: true,
+      session_age_minutes: Math.floor(Math.random() * 120),
     }),
   },
   {
     event_type: 'api_abuse',
     weight: 15,
     detailsFn: () => ({
-      endpoint: randomItem(['/api/documents', '/api/user/profile', '/api/share']),
+      endpoint: randomItem(['/api/documents', '/api/user/profile', '/api/share', '/api/certificates/verify']),
       requests_per_min: Math.floor(Math.random() * 200) + 80,
-      user_agent: 'python-requests/2.28.0',
+      user_agent: randomItem(['python-requests/2.28.0', 'curl/7.80.0', 'Go-http-client/1.1', 'Scrapy/2.7']),
+      payload_size_kb: Math.floor(Math.random() * 500) + 10,
     }),
   },
   {
@@ -62,20 +67,26 @@ const ATTACK_SCENARIOS = [
     detailsFn: () => ({
       new_device: Math.random() > 0.4,
       unusual_location: Math.random() > 0.5,
-      country: randomItem(['CN', 'RU', 'IR', 'KP', 'US']),
+      country: randomItem(['CN', 'RU', 'IR', 'KP', 'US', 'BR']),
       login_time: 'off-hours',
+      geo_velocity_anomaly: Math.random() > 0.6,
     }),
   },
 ];
 
-function pickScenario() {
-  const total = ATTACK_SCENARIOS.reduce((s, a) => s + a.weight, 0);
+function pickScenario(allowedTypes?: string[]) {
+  const pool = allowedTypes?.length
+    ? ATTACK_SCENARIOS.filter((s) => allowedTypes.includes(s.event_type))
+    : ATTACK_SCENARIOS;
+  if (pool.length === 0) return ATTACK_SCENARIOS[0];
+
+  const total = pool.reduce((s, a) => s + a.weight, 0);
   let r = Math.random() * total;
-  for (const s of ATTACK_SCENARIOS) {
+  for (const s of pool) {
     r -= s.weight;
     if (r <= 0) return s;
   }
-  return ATTACK_SCENARIOS[0];
+  return pool[0];
 }
 
 function riskFor(eventType: string, details: Record<string, unknown>): number {
@@ -90,17 +101,32 @@ function riskFor(eventType: string, details: Record<string, unknown>): number {
     let score = 45;
     if (details.new_device) score += 20;
     if (details.unusual_location) score += 15;
-    return score;
+    if (details.geo_velocity_anomaly) score += 10;
+    return Math.min(score, 100);
   }
   return 30;
 }
 
-export async function POST() {
+export async function POST(req: NextRequest) {
   try {
-    // Generate a burst of 3–6 events for dramatic demo effect
-    const count = Math.floor(Math.random() * 4) + 3;
+    let attackTypes: string[] | undefined;
+    let count = Math.floor(Math.random() * 4) + 3; // default 3-6
+
+    // Parse optional body parameters
+    try {
+      const body = await req.json();
+      if (Array.isArray(body.attack_types) && body.attack_types.length > 0) {
+        attackTypes = body.attack_types;
+      }
+      if (typeof body.count === 'number' && body.count >= 1) {
+        count = Math.min(body.count, 20); // cap at 20
+      }
+    } catch {
+      // No body or invalid JSON — use defaults
+    }
+
     const events = Array.from({ length: count }, () => {
-      const scenario = pickScenario();
+      const scenario = pickScenario(attackTypes);
       const details  = scenario.detailsFn();
       return {
         user_id:    randomItem(FAKE_USERS),

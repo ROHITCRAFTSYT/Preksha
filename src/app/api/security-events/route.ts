@@ -96,3 +96,20 @@ export async function GET() {
     return NextResponse.json({ error: 'Failed to fetch events' }, { status: 500 });
   }
 }
+
+// ── DELETE — clear all security events ────────────────────────────────────────
+export async function DELETE() {
+  try {
+    const { error } = await supabase
+      .from('security_events')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000'); // delete all rows
+
+    if (error) throw error;
+
+    return NextResponse.json({ cleared: true });
+  } catch (err) {
+    console.error('[security-events DELETE]', err);
+    return NextResponse.json({ error: 'Failed to clear events' }, { status: 500 });
+  }
+}

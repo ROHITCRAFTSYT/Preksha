@@ -112,6 +112,100 @@ create table public.subscriptions (
 create index subscriptions_user on public.subscriptions (user_id);
 
 -- ─────────────────────────────────────────────────────────────────────────────
+-- STEP 6b ─ security_events  (cyber threat monitor)
+-- ─────────────────────────────────────────────────────────────────────────────
+drop table if exists public.security_events cascade;
+
+create table public.security_events (
+  id          uuid        primary key default gen_random_uuid(),
+  user_id     text,
+  event_type  text        not null,
+  ip_address  text,
+  device_id   text,
+  risk_score  integer     not null default 0,
+  details     jsonb       not null default '{}',
+  created_at  timestamptz not null default now()
+);
+
+alter table public.security_events replica identity full;
+create index security_events_created on public.security_events (created_at desc);
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- STEP 6c ─ security_alerts  (correlated alerts from events)
+-- ─────────────────────────────────────────────────────────────────────────────
+drop table if exists public.security_alerts cascade;
+
+create table public.security_alerts (
+  id               uuid        primary key default gen_random_uuid(),
+  event_id         uuid        references public.security_events(id) on delete set null,
+  alert_type       text        not null,
+  severity         text        not null default 'medium'
+                   check (severity in ('critical','high','medium','low','info')),
+  title            text        not null,
+  description      text        not null default '',
+  mitre_tactic     text,
+  mitre_technique  text,
+  status           text        not null default 'new'
+                   check (status in ('new','acknowledged','investigating','resolved','false_positive')),
+  assigned_to      text,
+  created_at       timestamptz not null default now(),
+  updated_at       timestamptz not null default now()
+);
+
+alter table public.security_alerts replica identity full;
+create index security_alerts_status on public.security_alerts (status, created_at desc);
+
+create trigger security_alerts_updated_at
+  before update on public.security_alerts
+  for each row execute function update_updated_at();
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- STEP 6d ─ remediation_playbooks
+-- ─────────────────────────────────────────────────────────────────────────────
+drop table if exists public.remediation_playbooks cascade;
+
+create table public.remediation_playbooks (
+  id                     uuid        primary key default gen_random_uuid(),
+  title                  text        not null,
+  attack_type            text        not null,
+  severity_range         text        not null default 'medium-critical',
+  description            text        not null default '',
+  steps                  jsonb       not null default '[]',
+  mitre_tactics          jsonb       not null default '[]',
+  estimated_time_minutes integer     not null default 30,
+  created_at             timestamptz not null default now()
+);
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- STEP 6e ─ security_incidents  (groups alerts)
+-- ─────────────────────────────────────────────────────────────────────────────
+drop table if exists public.security_incidents cascade;
+
+create table public.security_incidents (
+  id          uuid        primary key default gen_random_uuid(),
+  title       text        not null,
+  description text        not null default '',
+  severity    text        not null default 'medium'
+              check (severity in ('critical','high','medium','low')),
+  status      text        not null default 'open'
+              check (status in ('open','investigating','mitigated','closed')),
+  alert_ids   jsonb       not null default '[]',
+  owner       text,
+  timeline    jsonb       not null default '[]',
+  playbook_id uuid        references public.remediation_playbooks(id) on delete set null,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now(),
+  closed_at   timestamptz
+);
+
+alter table public.security_incidents replica identity full;
+create index security_incidents_status on public.security_incidents (status, created_at desc);
+
+create trigger security_incidents_updated_at
+  before update on public.security_incidents
+  for each row execute function update_updated_at();
+
+-- ─────────────────────────────────────────────────────────────────────────────
 -- STEP 7 ─ auto-update updated_at trigger
 -- ─────────────────────────────────────────────────────────────────────────────
 create or replace function update_updated_at()
@@ -146,6 +240,18 @@ begin
   begin
     alter publication supabase_realtime add table public.health_checks;
   exception when others then null; end;
+
+  begin
+    alter publication supabase_realtime add table public.security_events;
+  exception when others then null; end;
+
+  begin
+    alter publication supabase_realtime add table public.security_alerts;
+  exception when others then null; end;
+
+  begin
+    alter publication supabase_realtime add table public.security_incidents;
+  exception when others then null; end;
 end $$;
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -157,6 +263,10 @@ alter table public.incidents      enable row level security;
 alter table public.plans          enable row level security;
 alter table public.users          enable row level security;
 alter table public.subscriptions  enable row level security;
+alter table public.security_events enable row level security;
+alter table public.security_alerts enable row level security;
+alter table public.security_incidents enable row level security;
+alter table public.remediation_playbooks enable row level security;
 
 -- Public: anyone can read services, incidents, health_checks, plans
 create policy "Public read services"
@@ -170,6 +280,18 @@ create policy "Public read health_checks"
 
 create policy "Public read plans"
   on public.plans for select using (true);
+
+create policy "Public read security_events"
+  on public.security_events for select using (true);
+
+create policy "Public read security_alerts"
+  on public.security_alerts for select using (true);
+
+create policy "Public read security_incidents"
+  on public.security_incidents for select using (true);
+
+create policy "Public read remediation_playbooks"
+  on public.remediation_playbooks for select using (true);
 
 -- Users: read/update only their own profile
 create policy "Users read own profile"

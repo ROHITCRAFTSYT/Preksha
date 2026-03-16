@@ -5,7 +5,7 @@ import Link from 'next/link';
 import ServiceCard from '@/components/ServiceCard';
 import IncidentFeed from '@/components/IncidentFeed';
 import ChaosPanel from '@/components/ChaosPanel';
-import CyberThreatMonitor from '@/components/CyberThreatMonitor';
+import SecurityDashboard from '@/components/SecurityDashboard';
 import GlassCategoryButton, { GlassDistortionFilter } from '@/components/GlassCategoryButton';
 import GlowCard from '@/components/GlowCard';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/Tooltip';
@@ -869,6 +869,8 @@ function Dashboard() {
               label="Cyber Threats"
               icon="🛡"
               active={activeTab === 'security'}
+              badge={securityStats.threats}
+              badgeDanger={securityStats.threats > 0}
               onClick={() => setActiveTab('security')}
             />
           </div>
@@ -1236,7 +1238,7 @@ function Dashboard() {
 
             {/* ── Tab: Security ─────────────────────────────────────────── */}
             {activeTab === 'security' && (
-              <CyberThreatMonitor />
+              <SecurityDashboard />
             )}
 
           </div>
