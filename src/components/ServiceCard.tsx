@@ -209,8 +209,8 @@ export default function ServiceCard({ service, onSimulateOutage, onRestoreServic
                 </div>
               )}
 
-              {/* Chaos controls — only visible when chaos mode is active */}
-              {chaosMode && (
+              {/* Chaos controls — INJECT when chaos mode is on, RESTORE always visible for injected services */}
+              {(chaosMode || service.chaosActive) && (
                 <div className="border-t border-red-500/20 pt-3 flex gap-2">
                   {!service.chaosActive ? (
                     <button

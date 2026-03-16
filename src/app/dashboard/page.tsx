@@ -446,16 +446,18 @@ function Dashboard() {
 
   const handleChaosAll = useCallback(async () => {
     setServices((prev) => prev.map((s) => simulateChaos(s)));
+    // Use INITIAL_SERVICES for IDs to avoid stale closure over `services`
+    const serviceIds = INITIAL_SERVICES.map((s) => s.id);
     try {
-      await Promise.all(services.map((s) =>
+      await Promise.all(serviceIds.map((id) =>
         fetch('/api/chaos', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ service_id: s.id, action: 'inject' }),
+          body: JSON.stringify({ service_id: id, action: 'inject' }),
         })
       ));
       await loadIncidents();
     } catch { /* ignore */ }
-  }, [services, loadIncidents]);
+  }, [loadIncidents]);
 
   const handleRestoreAll = useCallback(async () => {
     setServices(INITIAL_SERVICES.map((s) => ({ ...s, lastChecked: Date.now() })));
@@ -996,7 +998,7 @@ function Dashboard() {
           <div className="p-5 md:p-6 space-y-5">
 
             {/* ── Alert banners ────────────────────────────────────────── */}
-            {chaosMode && (
+            {(chaosMode || services.some((s) => s.chaosActive)) && (
               <div
                 className="border border-red-500/35 px-5 py-3.5 flex items-center justify-between gap-4 relative overflow-hidden"
                 style={{ background: 'linear-gradient(90deg, rgba(239,68,68,0.08) 0%, rgba(239,68,68,0.03) 50%, transparent 100%)' }}
@@ -1005,7 +1007,7 @@ function Dashboard() {
                 <div className="flex items-center gap-4 pl-2">
                   <span className="text-red-400 text-base">⚡</span>
                   <div>
-                    <div className="text-red-400 text-[11px] font-bold tracking-[0.25em]">CHAOS MODE ACTIVE — RESILIENCE TEST IN PROGRESS</div>
+                    <div className="text-red-400 text-[11px] font-bold tracking-[0.25em]">CHAOS INJECTION ACTIVE — RESILIENCE TEST IN PROGRESS</div>
                     <div className="text-red-400/45 text-[10px] mt-0.5">
                       Inject failures via Chaos Lab or individual service cards. All injections persist to the database.
                     </div>

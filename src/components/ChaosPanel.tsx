@@ -71,121 +71,133 @@ export default function ChaosPanel({
 
       {/* ── Body ───────────────────────────────────────────────────────── */}
       <div className="p-3 space-y-3">
-        {/* Inactive description */}
-        {!chaosMode && (
+        {/* Description */}
+        {!chaosMode && chaosCount === 0 && (
           <p className="text-[9px] text-white/30 leading-relaxed">
-            Simulate random service failures to test system resilience. Enable to inject failures into individual services or run a full infrastructure stress test.
+            Simulate random service failures to test system resilience. Inject failures into individual services below, or enable Chaos Mode for bulk stress testing.
           </p>
         )}
 
-        {/* Active controls — animated in/out */}
+        {/* Warning banner when chaos mode is on */}
         <AnimatePresence initial={false}>
           {chaosMode && (
             <motion.div
-              key="chaos-controls"
+              key="chaos-warning"
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
               transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
               style={{ overflow: 'hidden' }}
             >
-              <div className="space-y-3">
-                {/* Warning */}
-                <div className="text-[9px] text-red-400/80 leading-relaxed border border-red-500/20 p-2 bg-red-500/5">
-                  ⚠ CHAOS ACTIVE — Failures are being simulated and persisted to the database.
+              <div className="text-[9px] text-red-400/80 leading-relaxed border border-red-500/20 p-2 bg-red-500/5">
+                ⚠ CHAOS ACTIVE — Failures are being simulated and persisted to the database.
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Stats — visible when any services are injected */}
+        {chaosCount > 0 && (
+          <div className="grid grid-cols-2 gap-2 text-center">
+            <div className="border border-white/10 p-2">
+              <div className="text-lg font-bold tabular-nums text-red-400">{chaosCount}</div>
+              <div className="text-[8px] text-white/30 tracking-widest">INJECTED</div>
+            </div>
+            <div className="border border-white/10 p-2">
+              <div className="text-lg font-bold tabular-nums text-white/50">{services.length - chaosCount}</div>
+              <div className="text-[8px] text-white/30 tracking-widest">HEALTHY</div>
+            </div>
+          </div>
+        )}
+
+        {/* Per-service list — always visible */}
+        <div>
+          <div className="text-[8px] text-white/30 tracking-widest mb-2">TARGET SERVICE</div>
+          <div className="space-y-1 max-h-48 overflow-y-auto">
+            {services.map((s) => (
+              <div
+                key={s.id}
+                className={`flex items-center justify-between gap-2 border p-1.5 transition-colors ${
+                  s.chaosActive ? 'border-red-500/20 bg-red-500/5' : 'border-white/5'
+                }`}
+              >
+                <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                  <div className={`w-1 h-1 rounded-full flex-shrink-0 ${
+                    s.chaosActive ? 'bg-red-500 animate-pulse' : 'bg-white/20'
+                  }`} />
+                  <span className="text-[9px] text-white/60 truncate">{s.name}</span>
                 </div>
-
-                {/* Stats */}
-                <div className="grid grid-cols-2 gap-2 text-center">
-                  <div className="border border-white/10 p-2">
-                    <div className="text-lg font-bold tabular-nums text-red-400">{chaosCount}</div>
-                    <div className="text-[8px] text-white/30 tracking-widest">INJECTED</div>
-                  </div>
-                  <div className="border border-white/10 p-2">
-                    <div className="text-lg font-bold tabular-nums text-white/50">{services.length - chaosCount}</div>
-                    <div className="text-[8px] text-white/30 tracking-widest">HEALTHY</div>
-                  </div>
-                </div>
-
-                {/* Per-service list */}
-                <div>
-                  <div className="text-[8px] text-white/30 tracking-widest mb-2">TARGET SERVICE</div>
-                  <div className="space-y-1 max-h-48 overflow-y-auto">
-                    {services.map((s) => (
-                      <div
-                        key={s.id}
-                        className={`flex items-center justify-between gap-2 border p-1.5 transition-colors ${
-                          s.chaosActive ? 'border-red-500/20 bg-red-500/5' : 'border-white/5'
-                        }`}
-                      >
-                        <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                          <div className={`w-1 h-1 rounded-full flex-shrink-0 ${
-                            s.chaosActive ? 'bg-red-500 animate-pulse' : 'bg-white/20'
-                          }`} />
-                          <span className="text-[9px] text-white/60 truncate">{s.name}</span>
-                        </div>
-                        {!s.chaosActive ? (
-                          <button
-                            type="button"
-                            onClick={() => onSimulateOutage(s.id)}
-                            className="flex-shrink-0 px-2 py-0.5 border border-red-500/40 text-red-400 text-[8px] hover:bg-red-500/10 active:bg-red-500/20 transition-colors tracking-wider"
-                          >
-                            INJECT
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => onRestoreService(s.id)}
-                            className="flex-shrink-0 px-2 py-0.5 border border-green-500/40 text-green-400 text-[8px] hover:bg-green-500/10 active:bg-green-500/20 transition-colors tracking-wider"
-                          >
-                            RESTORE
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Bulk actions */}
-                <div className="border-t border-white/10 pt-3 flex gap-2">
-                  <AnimatePresence mode="wait" initial={false}>
-                    {!confirmAll ? (
-                      <motion.button
-                        key="chaos-all"
-                        type="button"
-                        initial={{ opacity: 0, scale: 0.97 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.97 }}
-                        transition={{ duration: 0.12 }}
-                        onClick={() => setConfirmAll(true)}
-                        className="flex-1 py-1.5 border border-red-500/50 text-red-400 text-[9px] hover:bg-red-500/10 active:bg-red-500/20 transition-colors tracking-widest"
-                      >
-                        ⚡ CHAOS ALL
-                      </motion.button>
-                    ) : (
-                      <motion.button
-                        key="confirm-chaos"
-                        type="button"
-                        initial={{ opacity: 0, scale: 0.97 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.97 }}
-                        transition={{ duration: 0.12 }}
-                        onClick={() => { onChaosAll(); setConfirmAll(false); }}
-                        className="flex-1 py-1.5 bg-red-500 text-white text-[9px] font-bold tracking-widest hover:bg-red-600 active:bg-red-700 transition-colors animate-pulse"
-                      >
-                        !! CONFIRM CHAOS
-                      </motion.button>
-                    )}
-                  </AnimatePresence>
-
+                {!s.chaosActive ? (
                   <button
                     type="button"
-                    onClick={() => { onRestoreAll(); setConfirmAll(false); }}
-                    className="flex-1 py-1.5 border border-green-500/50 text-green-400 text-[9px] hover:bg-green-500/10 active:bg-green-500/20 transition-colors tracking-widest"
+                    onClick={() => onSimulateOutage(s.id)}
+                    className="flex-shrink-0 px-2 py-0.5 border border-red-500/40 text-red-400 text-[8px] hover:bg-red-500/10 active:bg-red-500/20 transition-colors tracking-wider"
                   >
-                    ✓ RESTORE ALL
+                    INJECT
                   </button>
-                </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => onRestoreService(s.id)}
+                    className="flex-shrink-0 px-2 py-0.5 border border-green-500/40 text-green-400 text-[8px] hover:bg-green-500/10 active:bg-green-500/20 transition-colors tracking-wider"
+                  >
+                    RESTORE
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Bulk actions — only when chaos mode is enabled */}
+        <AnimatePresence initial={false}>
+          {chaosMode && (
+            <motion.div
+              key="bulk-actions"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
+              style={{ overflow: 'hidden' }}
+            >
+              <div className="border-t border-white/10 pt-3 flex gap-2">
+                <AnimatePresence mode="wait" initial={false}>
+                  {!confirmAll ? (
+                    <motion.button
+                      key="chaos-all"
+                      type="button"
+                      initial={{ opacity: 0, scale: 0.97 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.97 }}
+                      transition={{ duration: 0.12 }}
+                      onClick={() => setConfirmAll(true)}
+                      className="flex-1 py-1.5 border border-red-500/50 text-red-400 text-[9px] hover:bg-red-500/10 active:bg-red-500/20 transition-colors tracking-widest"
+                    >
+                      ⚡ CHAOS ALL
+                    </motion.button>
+                  ) : (
+                    <motion.button
+                      key="confirm-chaos"
+                      type="button"
+                      initial={{ opacity: 0, scale: 0.97 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.97 }}
+                      transition={{ duration: 0.12 }}
+                      onClick={() => { onChaosAll(); setConfirmAll(false); }}
+                      className="flex-1 py-1.5 bg-red-500 text-white text-[9px] font-bold tracking-widest hover:bg-red-600 active:bg-red-700 transition-colors animate-pulse"
+                    >
+                      !! CONFIRM CHAOS
+                    </motion.button>
+                  )}
+                </AnimatePresence>
+
+                <button
+                  type="button"
+                  onClick={() => { onRestoreAll(); setConfirmAll(false); }}
+                  className="flex-1 py-1.5 border border-green-500/50 text-green-400 text-[9px] hover:bg-green-500/10 active:bg-green-500/20 transition-colors tracking-widest"
+                >
+                  ✓ RESTORE ALL
+                </button>
               </div>
             </motion.div>
           )}
