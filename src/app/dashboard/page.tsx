@@ -5,6 +5,7 @@ import Link from 'next/link';
 import ServiceCard from '@/components/ServiceCard';
 import IncidentFeed from '@/components/IncidentFeed';
 import ChaosPanel from '@/components/ChaosPanel';
+import CyberThreatMonitor from '@/components/CyberThreatMonitor';
 import GlassCategoryButton, { GlassDistortionFilter } from '@/components/GlassCategoryButton';
 import GlowCard from '@/components/GlowCard';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/Tooltip';
@@ -13,7 +14,7 @@ import { supabase, signOut } from '@/lib/supabase';
 import type { DbService, DbIncident, DbHealthCheck } from '@/lib/supabase';
 import type { User } from '@supabase/supabase-js';
 
-type Tab = 'services' | 'events' | 'chaos';
+type Tab = 'services' | 'events' | 'chaos' | 'security';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -846,6 +847,12 @@ function Dashboard() {
               active={activeTab === 'chaos'}
               onClick={() => setActiveTab('chaos')}
             />
+            <NavItem
+              label="Cyber Threats"
+              icon="🛡"
+              active={activeTab === 'security'}
+              onClick={() => setActiveTab('security')}
+            />
           </div>
 
           {/* Search */}
@@ -974,7 +981,7 @@ function Dashboard() {
             className="md:hidden flex border-b"
             style={{ borderColor: 'rgba(255,255,255,0.07)', background: '#0d0d0d' }}
           >
-            {(['services', 'events', 'chaos'] as Tab[]).map((tab) => (
+            {(['services', 'events', 'chaos', 'security'] as Tab[]).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -1169,6 +1176,11 @@ function Dashboard() {
                   onRestoreService={handleRestoreService}
                 />
               </div>
+            )}
+
+            {/* ── Tab: Security ─────────────────────────────────────────── */}
+            {activeTab === 'security' && (
+              <CyberThreatMonitor />
             )}
 
           </div>
