@@ -1,10 +1,72 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, NextFetchEvent } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 const PROTECTED: string[] = []; // dashboard is public for demo
 
-export async function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest, event: NextFetchEvent) {
   const { pathname } = request.nextUrl;
+  
+  // ── 1. ACTIVE THREAT MITIGATION (DDoS & IP Blocking) ──────────────────────
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim() || '127.0.0.1';
+
+  // ── 1b. INLINE ANOMALY DETECTION (SQLi / XSS basic) ────────────────────────
+  const suspiciousPattern = /(union\s+select|script>|<svg|eval\()/i;
+  
+  try {
+    if (suspiciousPattern.test(decodeURIComponent(request.url))) {
+      // Log event asynchronously
+      event.waitUntil(
+        fetch(new URL('/api/security-events', request.url).toString(), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            event_type: 'api_abuse',
+            ip_address: ip,
+            user_id: 'anonymous',
+            details: { reason: 'suspicious_payload', url: request.url, mitigated: true }
+          })
+        }).catch(err => console.error('[Middleware Anomaly] Failed to log:', err))
+      );
+      
+      return new NextResponse(
+        JSON.stringify({ error: 'Access Denied: Malicious payload detected.' }), 
+        { status: 403, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+  } catch (e) {
+    // decodeURIComponent might throw if URI is malformed, block it as well
+    return new NextResponse(
+      JSON.stringify({ error: 'Bad Request: Malformed URI.' }), 
+      { status: 400, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+  
+  // Create an edge-compatible client. We use anon key if service role is missing.
+  const supabaseEdge = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { auth: { persistSession: false, autoRefreshToken: false } }
+  );
+
+  // Check if this IP is actively blocked
+  // (In production, this would use Redis/Upstash for sub-ms latency. Direct DB query for demo)
+  const { data: activeBlocks } = await supabaseEdge
+    .from('active_defenses')
+    .select('target_value')
+    .eq('target_type', 'ip')
+    .eq('action', 'block')
+    .eq('status', 'active');
+
+  const isBlocked = activeBlocks?.some((defense) => defense.target_value === ip);
+  
+  if (isBlocked) {
+    return new NextResponse(
+      JSON.stringify({ error: 'Access Denied: Malicious activity detected. Connection dropped.' }), 
+      { status: 403, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+  // ────────────────────────────────────────────────────────────────────────────
+
   const isProtected = PROTECTED.some((p) => pathname.startsWith(p));
 
   const accessToken  = request.cookies.get('sb-access-token')?.value;
@@ -105,5 +167,13 @@ function setCookies(response: NextResponse, accessToken: string, refreshToken: s
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*'],
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     */
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+  ],
 };

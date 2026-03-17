@@ -60,24 +60,47 @@ export async function POST(req: NextRequest) {
     const title = `${EVENT_TITLES[event_type] ?? event_type} — ${ip_address ?? 'unknown IP'}`;
     const description = buildDescription(event_type, details, risk_score);
 
-    const { data, error } = await supabase
+    // ── Phase 3: Automated Remediation & Audit Logging ───────────────────
+    let autoBlocked = false;
+    let autoBlockDescription = '';
+    
+    // Automatically block the IP for critical severity alerts
+    if (severity === 'critical' && ip_address) {
+      const { error: blockErr } = await supabase
+        .from('active_defenses')
+        .insert({
+          target_type: 'ip',
+          target_value: ip_address,
+          action: 'block',
+          status: 'active',
+        });
+        
+      if (!blockErr) {
+        autoBlocked = true;
+        autoBlockDescription = '[AUTO-REMEDIATED] IP address blocked by active defense mechanism.';
+      }
+    }
+
+    const finalDescription = autoBlockDescription ? `${description} ${autoBlockDescription}` : description;
+
+    const { data: alert, error } = await supabase
       .from('security_alerts')
       .insert({
         event_id: event_id ?? null,
         alert_type: event_type,
         severity,
         title,
-        description,
+        description: finalDescription,
         mitre_tactic: mitre.tactic,
         mitre_technique: mitre.technique,
-        status: 'new',
+        status: autoBlocked ? 'acknowledged' : 'new',
       })
       .select()
       .single();
 
     if (error) throw error;
-
-    return NextResponse.json({ alert: data });
+    
+    return NextResponse.json({ alert });
   } catch (err) {
     console.error('[security-alerts POST]', err);
     return NextResponse.json({ error: 'Failed to create alert' }, { status: 500 });

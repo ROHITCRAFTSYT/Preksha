@@ -438,3 +438,31 @@ values
     '[{"label":"State NIC Portal","url":"#","description":"Access state-level food department portal"},{"label":"FPS Locator","url":"#","description":"Find Fair Price Shops in your area"}]'
   )
 on conflict (id) do nothing;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- STEP 12 ─ Secure Vault (Client-Side E2EE)
+-- ─────────────────────────────────────────────────────────────────────────────
+drop table if exists public.vault_documents cascade;
+
+create table public.vault_documents (
+  id                  uuid        primary key default gen_random_uuid(),
+  user_id             uuid        references auth.users(id) on delete cascade,
+  filename_encrypted  text        not null,
+  iv                  text        not null,
+  salt                text        not null,
+  storage_path        text        not null,
+  mime_type           text        not null,
+  created_at          timestamptz not null default now()
+);
+
+alter table public.vault_documents enable row level security;
+
+-- For this demo, allow public access so the vault UI works without signing in
+create policy "Public full access to vault_documents"
+  on public.vault_documents for all using (true) with check (true);
+
+-- NOTE FOR STORAGE:
+-- You must manually create a new storage bucket in Supabase named: secure_vault
+-- 1. Go to "Storage" in Supabase
+-- 2. Click "New Bucket", name it "secure_vault"
+-- 3. Make sure to set bucket policies to allow public read/write for this demo.
