@@ -10,7 +10,7 @@
 
 ResilienceOS monitors 8 critical government portals across 5 regional nodes in real time — detecting outages in under 15 seconds, generating AI-powered incident reports via Groq, and guiding citizens to fallback services when portals go down.
 
-**Live:** [precious-piroshki-06a175.netlify.app](https://precious-piroshki-06a175.netlify.app) · [resos-jwwd.onrender.com](https://resos-jwwd.onrender.com)
+**Live:** [resos-jwwd.onrender.com](https://resos-jwwd.onrender.com)
 
 ![Architecture](public/architecture.png)
 
