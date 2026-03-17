@@ -95,11 +95,23 @@ export async function POST(req: NextRequest) {
 
     // Live Cyber Defense Auto Response Check
     const enrichedDetails = { ...details };
+    
+    // 1. Log to Honeypot Credentials Database if it's a simulated attack
+    if (enrichedDetails.honeypot_triggered) {
+      const { error: hpError } = await supabase.from('honeypot_credentials').insert({
+        username: user_id,
+        password_payload: enrichedDetails.payload,
+        ip_address: ip,
+        attack_vector: event_type,
+      });
+      if (hpError) console.error('[Honeypot Insert Warning]:', hpError.message);
+    }
+
     if (risk_score > 80) {
       enrichedDetails.status = 'blocked';
       
       // Attempt to add to active_defenses (simulate block)
-      await supabase
+      const { error: adError } = await supabase
         .from('active_defenses')
         .insert({
           target_type: 'ip',
@@ -107,6 +119,7 @@ export async function POST(req: NextRequest) {
           action: 'block',
           status: 'active',
         });
+      if (adError) console.error('[Active Defenses Insert Warning]:', adError.message);
     } else {
       enrichedDetails.status = 'detected';
     }

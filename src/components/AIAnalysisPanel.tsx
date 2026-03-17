@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { SecurityEvent } from './AttackFeed';
 
 export default function AIAnalysisPanel({ selectedEvent }: { selectedEvent: SecurityEvent | null }) {
-  const [analysis, setAnalysis] = useState<{ attack_type: string; severity: string; recommended_action: string } | null>(null);
+  const [analysis, setAnalysis] = useState<{ attack_type: string; severity: string; playbook_steps?: { title: string; description: string }[]; recommended_action?: string } | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -88,12 +88,31 @@ export default function AIAnalysisPanel({ selectedEvent }: { selectedEvent: Secu
               </div>
             </div>
 
-            <div>
-              <div className="text-[9px] text-white/30 tracking-widest mb-1">RECOMMENDED ACTION</div>
-              <div className="text-[11px] leading-relaxed text-blue-400/90 border border-blue-500/20 bg-blue-500/5 p-4 rounded-sm">
-                {analysis.recommended_action}
+            {analysis.playbook_steps && analysis.playbook_steps.length > 0 ? (
+              <div>
+                <div className="text-[9px] text-white/30 tracking-widest mb-1 mt-2">AI PLAYBOOK REMEDIATION</div>
+                <div className="space-y-2 mt-2">
+                  {analysis.playbook_steps.map((step, idx) => (
+                    <div key={idx} className="border border-blue-500/20 bg-blue-500/5 p-3 rounded-sm flex gap-3">
+                      <div className="text-[10px] text-blue-400/80 font-bold bg-blue-500/10 h-5 w-5 flex items-center justify-center shrink-0">
+                        {idx + 1}
+                      </div>
+                      <div>
+                        <div className="text-[11px] font-bold text-blue-300">{step.title}</div>
+                        <div className="text-[10px] text-blue-400/80 mt-1 leading-relaxed">{step.description}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
+            ) : analysis.recommended_action ? (
+              <div>
+                <div className="text-[9px] text-white/30 tracking-widest mb-1 mt-2">RECOMMENDED ACTION</div>
+                <div className="text-[11px] leading-relaxed text-blue-400/90 border border-blue-500/20 bg-blue-500/5 p-4 rounded-sm">
+                  {analysis.recommended_action}
+                </div>
+              </div>
+            ) : null}
 
             {selectedEvent.details?.payload && (
               <div className="mt-4">

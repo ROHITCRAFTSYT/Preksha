@@ -860,10 +860,22 @@ function Dashboard() {
             />
             <div className="px-3 pt-3 pb-1.5 text-[9px] text-white/20 tracking-[0.2em]">TOOLS</div>
             <NavItem
+              label="Security Lab"
+              icon="🔬"
+              active={false}
+              onClick={() => router.push('/dashboard/security-lab')}
+            />
+            <NavItem
               label="Chaos Lab"
               icon="⚡"
               active={activeTab === 'chaos'}
               onClick={() => setActiveTab('chaos')}
+            />
+            <NavItem
+              label="Legacy Admin"
+              icon="🗄️"
+              active={false}
+              onClick={() => router.push('/legacy-admin')}
             />
             <NavItem
               label="Cyber Threats"

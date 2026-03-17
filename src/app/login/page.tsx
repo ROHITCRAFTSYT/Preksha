@@ -112,6 +112,21 @@ function LoginForm() {
           body: JSON.stringify({ email, password }),
         });
         const json = await res.json() as { error?: string };
+        
+        // Log the login attempt to the security events API
+        await fetch('/api/security-events', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            event_type: !res.ok ? 'failed_login' : 'suspicious_login', // Always log as suspicious or failed to hit the dashboard feed
+            user_id: email,
+            details: {
+              status: !res.ok ? 'failed' : 'success',
+              endpoint: '/login',
+            },
+          }),
+        }).catch(() => {}); // Fire and forget
+        
         if (!res.ok) { setError(json.error ?? 'Login failed'); return; }
         await signIn(email, password);
         router.push(redirect);
