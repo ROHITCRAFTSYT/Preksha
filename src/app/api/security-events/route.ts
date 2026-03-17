@@ -6,18 +6,57 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
 );
 
-// ── Download burst tracker (in-memory, per IP) ────────────────────────────────
+// ── Trackers (in-memory, per IP) ──────────────────────────────────────────────
 const downloadTracker: Record<string, { count: number; windowStart: number }> = {};
+const ddosTracker: Record<string, { count: number; windowStart: number }> = {};
+const loginTracker: Record<string, { count: number; windowStart: number }> = {};
 
 function calcRiskScore(
   eventType: string,
   ipAddress: string,
   details: Record<string, unknown>,
 ): number {
-  let score = 0;
+  let score = 20; // default low
 
+  const now = Date.now();
+
+  // 1. DDoS handling
+  if (eventType === 'api_abuse' || eventType === 'ddos') {
+    const t = ddosTracker[ipAddress] ?? { count: 0, windowStart: now };
+    if (now - t.windowStart > 10_000) {
+      t.count = 1;
+      t.windowStart = now;
+    } else {
+      t.count += 1;
+    }
+    ddosTracker[ipAddress] = t;
+    if (t.count > 50) return 90;
+    if (t.count > 20) return 50;
+    return 20;
+  }
+
+  // 2. Brute Force handling
+  if (eventType === 'brute_force_login' || eventType === 'failed_login') {
+    const t = loginTracker[ipAddress] ?? { count: 0, windowStart: now };
+    if (now - t.windowStart > 60_000) {
+      t.count = 1;
+      t.windowStart = now;
+    } else {
+      t.count += 1;
+    }
+    loginTracker[ipAddress] = t;
+    if (t.count > 5) return 90;
+    return 50;
+  }
+
+  // 3. SQL Injection handling
+  const payload = details?.payload as string;
+  if (payload && (payload.includes("' OR 1=1") || payload.toLowerCase().includes("union select"))) {
+    return 90;
+  }
+
+  // Existing Rules
   if (eventType === 'document_download') {
-    const now = Date.now();
     const tracker = downloadTracker[ipAddress] ?? { count: 0, windowStart: now };
     if (now - tracker.windowStart > 60_000) {
       tracker.count = 1;
@@ -26,19 +65,16 @@ function calcRiskScore(
       tracker.count += 1;
     }
     downloadTracker[ipAddress] = tracker;
-    // >10 downloads in 60 seconds → HIGH risk
-    if (tracker.count > 10) score = 90;
-    else if (tracker.count > 5) score = 55;
-    else score = 10;
+    if (tracker.count > 10) return 90;
+    if (tracker.count > 5) return 50;
+    return 20;
   }
 
-  if (eventType === 'brute_force_login') score = 85;
-  if (eventType === 'token_hijack_attempt') score = 95;
-  if (eventType === 'api_abuse') score = 70;
+  if (eventType === 'token_hijack_attempt') return 90;
   if (eventType === 'suspicious_login') {
     score = 50;
     if (details?.new_device) score += 20;
-    if (details?.unusual_location) score += 15;
+    if (details?.unusual_location) score += 20;
   }
 
   return Math.min(score, 100);
@@ -57,6 +93,24 @@ export async function POST(req: NextRequest) {
     const ip = ip_address ?? req.headers.get('x-forwarded-for') ?? '0.0.0.0';
     const risk_score = calcRiskScore(event_type, ip, details ?? {});
 
+    // Live Cyber Defense Auto Response Check
+    const enrichedDetails = { ...details };
+    if (risk_score > 80) {
+      enrichedDetails.status = 'blocked';
+      
+      // Attempt to add to active_defenses (simulate block)
+      await supabase
+        .from('active_defenses')
+        .insert({
+          target_type: 'ip',
+          target_value: ip,
+          action: 'block',
+          status: 'active',
+        });
+    } else {
+      enrichedDetails.status = 'detected';
+    }
+
     const { data, error } = await supabase
       .from('security_events')
       .insert({
@@ -65,7 +119,7 @@ export async function POST(req: NextRequest) {
         ip_address: ip,
         device_id: device_id ?? null,
         risk_score,
-        details: details ?? {},
+        details: enrichedDetails,
       })
       .select()
       .single();
