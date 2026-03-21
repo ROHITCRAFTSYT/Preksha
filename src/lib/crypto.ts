@@ -2,7 +2,7 @@
 
 const ITERATIONS = 100000;
 const KEY_LENGTH = 256;
-const DIGEST = 'SHA-256';
+const DIGEST = 'SHA-256' as const;
 
 /**
  * Utility to convert Uint8Array to Base64 string
@@ -13,14 +13,14 @@ function bufferToBase64(buffer: ArrayBuffer | Uint8Array): string {
   for (let i = 0; i < bytes.byteLength; i++) {
     binary += String.fromCharCode(bytes[i]);
   }
-  return window.btoa(binary);
+  return typeof window !== 'undefined' ? window.btoa(binary) : Buffer.from(binary, 'binary').toString('base64');
 }
 
 /**
  * Utility to convert Base64 string to Uint8Array
  */
 function base64ToBuffer(base64: string): Uint8Array {
-  const binary_string = window.atob(base64);
+  const binary_string = typeof window !== 'undefined' ? window.atob(base64) : Buffer.from(base64, 'base64').toString('binary');
   const len = binary_string.length;
   const bytes = new Uint8Array(len);
   for (let i = 0; i < len; i++) {
@@ -36,7 +36,8 @@ async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey>
   const enc = new TextEncoder();
   
   // 1. Import the raw password
-  const keyMaterial = await window.crypto.subtle.importKey(
+  const crypto = typeof window !== 'undefined' ? window.crypto : (globalThis as any).crypto;
+  const keyMaterial = await crypto.subtle.importKey(
     'raw',
     enc.encode(password),
     { name: 'PBKDF2' },
@@ -45,10 +46,10 @@ async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey>
   );
 
   // 2. Derive the AES-GCM key
-  return window.crypto.subtle.deriveKey(
+  return crypto.subtle.deriveKey(
     {
       name: 'PBKDF2',
-      salt: salt,
+      salt: salt as any,
       iterations: ITERATIONS,
       hash: DIGEST,
     },
@@ -77,10 +78,10 @@ export async function encryptFile(
   const arrayBuffer = await file.arrayBuffer();
 
   // Encrypt the buffer using AES-GCM
-  const encryptedBuffer = await window.crypto.subtle.encrypt(
+  const encryptedBuffer = await crypto.subtle.encrypt(
     {
       name: 'AES-GCM',
-      iv: iv,
+      iv: iv as any,
     },
     key,
     arrayBuffer
@@ -120,7 +121,7 @@ export async function decryptFile(
     decryptedBuffer = await window.crypto.subtle.decrypt(
       {
         name: 'AES-GCM',
-        iv: iv,
+        iv: iv as any,
       },
       key,
       arrayBuffer

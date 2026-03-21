@@ -202,7 +202,7 @@ export default function SecureVault() {
                     <button
                       onClick={handleUpload}
                       disabled={uploading}
-                      className={\`px-6 py-3 border border-green-500/40 text-green-400 text-[11px] font-bold tracking-wider transition-all \${uploading ? 'bg-green-500/20 animate-pulse' : 'hover:bg-green-500/10'}\`}
+                      className={`px-6 py-3 border border-green-500/40 text-green-400 text-[11px] font-bold tracking-wider transition-all ${uploading ? 'bg-green-500/20 animate-pulse' : 'hover:bg-green-500/10'}`}
                     >
                       {uploading ? 'ENCRYPTING & SENDING...' : 'ENCRYPT -> UPLOAD'}
                     </button>
@@ -247,11 +247,11 @@ export default function SecureVault() {
                         <button
                           onClick={() => handleDownload(doc)}
                           disabled={downloadingId === doc.id}
-                          className={\`px-4 py-2 border transition-all text-[10px] tracking-widest font-bold \${
+                          className={`px-4 py-2 border transition-all text-[10px] tracking-widest font-bold ${
                             downloadingId === doc.id
                               ? 'border-green-500/40 text-green-400 bg-green-500/10 animate-pulse'
                               : 'border-white/20 text-white/60 hover:text-white hover:border-white/40 hover:bg-white/5'
-                          }\`}
+                          }`}
                         >
                           {downloadingId === doc.id ? 'DECRYPTING...' : 'FETCH & DECRYPT'}
                         </button>

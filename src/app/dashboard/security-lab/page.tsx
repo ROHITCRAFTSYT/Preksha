@@ -60,9 +60,18 @@ export default function SecurityLabDashboard() {
     <div className="min-h-screen bg-[#050505] text-white p-6 space-y-6">
       {/* Top Header & Defense Status Bar */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-white/[0.08] pb-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white/90">SECURITY LAB</h1>
-          <p className="text-[11px] text-white/40 tracking-[0.2em] uppercase mt-1">Advanced Threat Simulation & Auto-Remediation</p>
+        <div className="flex items-center gap-4">
+          <Link 
+            href="/dashboard" 
+            className="group flex flex-col items-center justify-center h-12 w-12 border border-white/10 hover:border-white/30 hover:bg-white/5 transition-all rounded-sm"
+          >
+            <span className="text-[14px] leading-none mb-0.5">←</span>
+            <span className="text-[7px] tracking-[0.2em] text-white/40 group-hover:text-white/80 uppercase">Exit</span>
+          </Link>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-white/90">SECURITY LAB</h1>
+            <p className="text-[11px] text-white/40 tracking-[0.2em] uppercase mt-1">Advanced Threat Simulation & Auto-Remediation</p>
+          </div>
         </div>
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-3 px-4 py-2 bg-red-500/10 border border-red-500/20 rounded-sm">
